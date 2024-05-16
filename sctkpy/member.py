@@ -264,7 +264,7 @@ class Member:
                     sum_credits += course.hrs
 
                     logger.debug(
-                        '\t\tCourse Info: %s %s %s, %i hrs, grade = "%s", '
+                        '\t\tCourse Info: %s %s %s, %i hrs, grade="%s", '
                         + "(grade point: %s, weight (grade point x hrs): %s)",
                         term.term,
                         course.class_name,
@@ -277,6 +277,15 @@ class Member:
                             if grade_point is not None
                             else "None"
                         ),
+                    )
+                else:
+                    logger.debug(
+                        '\t\tCannot use course: %s %s %s, %i hrs, grade="%s"',
+                        term.term,
+                        course.class_name,
+                        course.catalog_no,
+                        course.hrs,
+                        course.grade,
                     )
             if (
                 sum_credits < FULL_TIME_HOURS
