@@ -4,8 +4,8 @@ import argparse
 import random
 import re
 
-import sctkpy.core
 import sctkpy.db_funcs
+import sctkpy.reports
 
 
 def validate_term(term: str):
@@ -91,13 +91,13 @@ def main():
 
     if args.report is not None:
         validate_term(args.report)
-        sctkpy.core.generate_grade_report(term=args.report)
+        sctkpy.reports.generate_grade_report(term=args.report)
     if args.checklist is not None:
         validate_term(args.checklist)
-        sctkpy.core.generate_study_check_sheet(term=args.checklist)
+        sctkpy.reports.generate_study_check_sheet(term=args.checklist)
     if args.files is not None:
         validate_term(args.files)
-        sctkpy.core.generate_files_responsibility_report(term=args.files)
+        sctkpy.reports.generate_files_responsibility_report(term=args.files)
 
     return
 
