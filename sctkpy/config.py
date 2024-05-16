@@ -136,12 +136,16 @@ app_dir: str = os.path.join(proj_root_dir, "sctkpy")
 assert os.path.isdir(app_dir), f"{app_dir}, is not a dir"
 
 grade_report_dir: str = os.path.join(proj_root_dir, "gradereports")
+if not os.path.exists(grade_report_dir):
+    os.mkdir(grade_report_dir)
 assert os.path.isdir(grade_report_dir), f"{grade_report_dir}, is not a dir"
 
 template_form_dir: str = os.path.join(app_dir, "templates")
 assert os.path.isdir(template_form_dir), f"{template_form_dir}, is not a dir"
 
 logs_dir: str = os.path.join(app_dir, "logs")
+if not os.path.exists(logs_dir):
+    os.mkdir(logs_dir)
 assert os.path.isdir(logs_dir), f"{logs_dir}, is not a dir"
 
 grade_report_template_path: str = os.path.join(
@@ -157,6 +161,11 @@ files_hit_list_template_path: str = os.path.join(
 )
 
 db_path: str = os.path.join(app_dir, "db", "sctkpy.db")
+if not os.path.exists(os.path.dirname(db_path)):
+    os.mkdir(os.path.dirname(db_path))
+assert os.path.isdir(
+    os.path.dirname(db_path)
+), f"{os.path.dirname(db_path)}, is not a dir"
 
 default_roster_csv_path: str = os.path.join(
     proj_root_dir, "greeklife_roster_report.csv"
