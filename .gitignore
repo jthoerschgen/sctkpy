@@ -2,7 +2,9 @@
 *.db
 *.log
 *.xlsx
+*.xlsx#
 *.csv
+*.csv#
 *.drawio
 
 # directories to exclude contents of:

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import random
 import re
 
 import sctkpy.core
@@ -51,7 +52,15 @@ def main():
     A tool for aiding in the duties of the                      :=#%@@@@@@@*
     scholarship chairman.                                              -*#:
     """,
-        epilog="and don't forget to do your homework",
+        epilog=random.choice(
+            [
+                "and don't forget to do your homework",
+                "those found not studying will be beat severely",
+                "use at your own risk",
+                "may contain dairy",
+                "I love my rabbit, Peter.",
+            ]
+        ),
     )
 
     parser.add_argument(
