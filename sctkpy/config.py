@@ -83,6 +83,32 @@ class StudyHourTier:
         return self.compare(x=gpa, y=self.bound)
 
 
+class StrikeTier(StudyHourTier):
+    """Child class of StudyHourTier"""
+
+    def __init__(
+        self,
+        bound: float,
+        condition: str,
+        result_in_house: str,
+        desc_in_house: str,
+        result_out_house: str,
+        desc_out_house: str,
+        num_chances: int,
+    ):
+        super().__init__(
+            bound,
+            condition,
+            result_in_house,
+            desc_in_house,
+            result_out_house,
+            desc_out_house,
+        )
+        self.num_chances: int = num_chances
+
+
+"""Study Hour GPA Tiers
+"""
 no_study_hours = StudyHourTier(
     bound=3.00,
     condition=">=",
@@ -124,6 +150,38 @@ social_probation = StudyHourTier(
     desc_out_house="Social Probation",
 )
 
+"""Strike GPA Tiers
+"""
+
+term_gpa_strike = StrikeTier(
+    bound=2.50,
+    condition="<",
+    result_in_house="",
+    desc_in_house="Strike (Term GPA)",
+    result_out_house="",
+    desc_out_house="Strike (Term GPA)",
+    num_chances=3,
+)
+
+term_gpa_super_strike = StrikeTier(
+    bound=1.75,
+    condition="<",
+    result_in_house="",
+    desc_in_house="Super Strike (Term GPA)",
+    result_out_house="",
+    desc_out_house="Super Strike (Term GPA)",
+    num_chances=2,
+)
+
+# cumulative_gpa_strike = StudyHourTier(
+#     bound=2.50,
+#     condition="<",
+#     result_in_house="",
+#     desc_in_house="Strike (Cumulative GPA)",
+#     result_out_house="",
+#     desc_out_house="Strike (Cumulative GPA)",
+# )
+
 """Path variables
 """
 
@@ -158,6 +216,10 @@ study_checks_template_path: str = os.path.join(
 
 files_hit_list_template_path: str = os.path.join(
     template_form_dir, "files_hit_list_template.xlsx"
+)
+
+individual_report_template_path: str = os.path.join(
+    template_form_dir, "individual_grade_report_template.xlsx"
 )
 
 db_path: str = os.path.join(app_dir, "db", "sctkpy.db")

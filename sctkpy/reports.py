@@ -1,23 +1,33 @@
 # -*- coding: utf-8 -*-
 
+"""Generate reports using templates the sheets in ./templates
+"""
+
 import datetime
 import os
 import shutil
 
 import openpyxl
+import openpyxl.drawing
+import openpyxl.drawing.image
+from PIL import Image
+from tqdm import tqdm
 
-from .config import (
+from .config import (  # cumulative_gpa_strike,
     files_hit_list_template_path,
     grade_report_template_path,
+    individual_report_template_path,
     no_punting,
     no_study_hours,
     proj_root_dir,
     social_probation,
     study_checks_template_path,
+    term_gpa_strike,
+    term_gpa_super_strike,
     tier_one,
     tier_two,
 )
-from .core import get_member_info
+from .core import get_member_info, plot_member_gpa
 from .db_funcs import get_files_due_list_db
 from .member import Member
 
@@ -29,8 +39,9 @@ def generate_grade_report(term: str, open_on_finish: bool = True) -> None:
     Args:
         term (str): Term to use grade data from
     """
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     grade_report_save_path: str = os.path.join(
-        proj_root_dir, f"Grade_Report_{term}.xlsx"
+        proj_root_dir, f"Grade_Report_{term}_{current_time}.xlsx"
     )
     shutil.copy(src=grade_report_template_path, dst=grade_report_save_path)
 
@@ -194,8 +205,9 @@ def generate_study_check_sheet(term: str, open_on_finish: bool = True) -> None:
     Args:
         term (str): Term to use grade data from
     """
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     study_checks_save_path: str = os.path.join(
-        proj_root_dir, f"Study_Check_Sheet_{term}.xlsx"
+        proj_root_dir, f"Study_Check_Sheet_{term}_{current_time}.xlsx"
     )
     shutil.copy(src=study_checks_template_path, dst=study_checks_save_path)
 
@@ -236,8 +248,9 @@ def generate_files_responsibility_report(
     Args:
         term (str): Term to use course data from
     """
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     files_hit_list_save_path: str = os.path.join(
-        proj_root_dir, f"Files_Hit_List_{term}.xlsx"
+        proj_root_dir, f"Files_Hit_List_{term}_{current_time}.xlsx"
     )
     shutil.copy(src=files_hit_list_template_path, dst=files_hit_list_save_path)
 
@@ -293,5 +306,245 @@ def generate_files_responsibility_report(
     workbook.save(files_hit_list_save_path)
     if open_on_finish:
         os.startfile(files_hit_list_save_path)
+
+    return
+
+
+def generate_individual_academic_report(open_on_finish: bool = True) -> None:
+    """Generate an extensive report on each member's academics over all data
+
+    Args:
+        open_on_finish (bool): Open file automatically when done
+    """
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    individual_report_save_path: str = os.path.join(
+        proj_root_dir, f"Individual_Grade_Report_{current_time}.xlsx"
+    )
+    shutil.copy(
+        src=individual_report_template_path, dst=individual_report_save_path
+    )
+
+    workbook = openpyxl.load_workbook(filename=individual_report_save_path)
+
+    start_row = 2
+    start_col = 5
+    # Key information
+    for i, strike_type in enumerate((term_gpa_strike, term_gpa_super_strike)):
+        workbook["info"].cell(
+            row=start_row + i,
+            column=start_col,
+            value=strike_type.desc_in_house + ":",
+        )
+        workbook["info"].cell(
+            row=start_row + i,
+            column=start_col + 2,
+            value=strike_type.condition + str(strike_type.bound),
+        )
+        workbook["info"].cell(
+            row=start_row + i,
+            column=start_col + 3,
+            value=strike_type.num_chances,
+        )
+
+    info_sheet_start_row = 5
+    info_sheet_start_col = 1
+    members: list[Member] = get_member_info()
+    for member_index, member in tqdm(
+        list(enumerate(members)), desc="Generating Individual GPA Reports"
+    ):
+        worksheet = workbook.copy_worksheet(workbook["template"])
+        worksheet.title = member.name
+
+        for cf_range in workbook[
+            "template"
+        ].conditional_formatting._cf_rules:  # pylint: disable=protected-access
+            for cf_rule in workbook[
+                "template"
+            ].conditional_formatting._cf_rules[
+                cf_range
+            ]:  # pylint: disable=protected-access
+                worksheet.conditional_formatting.add(cf_range, cf_rule)
+
+        start_row = 1
+        start_col = 4
+        for i, name_part in enumerate(
+            (
+                member.name.split()[0],
+                (
+                    " ".join(member.name.split()[1:])
+                    if len(member.name.split()) > 1
+                    else ""
+                ),
+            ),
+        ):
+            workbook["info"].cell(
+                row=info_sheet_start_row + member_index,
+                column=info_sheet_start_col + i,
+                value=name_part,
+            )  # Write to main info sheet
+            worksheet.cell(
+                row=start_row,
+                column=start_col + i,
+                value=name_part,
+            )  # Write to their individual report
+
+        terms_list, term_gpa_list, cumulative_gpa_list = (
+            member.generate_academic_report()
+        )
+
+        # Write to info sheet
+        workbook["info"].cell(
+            row=info_sheet_start_row + member_index,
+            column=info_sheet_start_col + 2,
+            value=member.pledge_class,
+        )  # Write to main info sheet
+        workbook["info"].cell(
+            row=info_sheet_start_row + member_index,
+            column=info_sheet_start_col + 3,
+            value=len(
+                [
+                    gpa
+                    for gpa in term_gpa_list
+                    if gpa is not None and term_gpa_strike.test_tier(gpa)
+                ]
+            ),
+        )  # Number of strikes
+        workbook["info"].cell(
+            row=info_sheet_start_row + member_index,
+            column=info_sheet_start_col + 4,
+            value=len(
+                [
+                    gpa
+                    for gpa in term_gpa_list
+                    if gpa is not None and term_gpa_super_strike.test_tier(gpa)
+                ]
+            ),
+        )  # Number of super strikes
+        workbook["info"].cell(
+            row=info_sheet_start_row + member_index,
+            column=info_sheet_start_col + 5,
+            value=len(terms_list),
+        )  # Number of terms
+
+        # Write Summary Information
+        start_row = 4
+        start_col = 6
+        for i, term_gpa_data in enumerate(
+            zip(terms_list, term_gpa_list, cumulative_gpa_list)
+        ):
+            term, term_gpa, cumulative_gpa = term_gpa_data
+
+            rounded_term_gpa = (
+                float(f"{term_gpa:.3f}") if term_gpa is not None else None
+            )
+            rounded_cumulative_gpa = (
+                float(f"{cumulative_gpa:.3f}")
+                if cumulative_gpa is not None
+                else None
+            )
+
+            worksheet.cell(
+                row=start_row + i,
+                column=start_col,
+                value=term,
+            )  # Term name
+            worksheet.cell(
+                row=start_row + i,
+                column=start_col + 1,
+                value=rounded_term_gpa,
+            )  # Calculated term GPA
+            campus_term_gpa = (
+                member.terms[term].term_gpa
+                if isinstance(member.terms[term].term_gpa, float)
+                else None
+            )
+            worksheet.cell(
+                row=start_row + i,
+                column=start_col + 2,
+                value=(
+                    float(f"{campus_term_gpa:.3f}")
+                    if campus_term_gpa is not None
+                    else ""
+                ),
+            )  # Campus term GPA
+            worksheet.cell(
+                row=start_row + i,
+                column=start_col + 3,
+                value=rounded_cumulative_gpa,
+            )  # Calculated cumulative GPA
+            worksheet.cell(
+                row=start_row + i,
+                column=start_col + 4,
+                value=float(f"{member.terms[term].term_cum_gpa:.3f}"),
+            )  # Campus cumulative GPA
+            worksheet.cell(
+                row=start_row + i,
+                column=start_col + 5,
+                value=sum(
+                    [course.hrs for course in member.terms[term].classes]
+                ),
+            )  # Credit hours for the semester
+            worksheet.cell(
+                row=start_row + i,
+                column=start_col + 6,
+                value=(
+                    "X"
+                    if (
+                        #     cumulative_gpa is not None
+                        #     and cumulative_gpa_strike.test_tier(cumulative_gpa)
+                        # )
+                        # or (
+                        term_gpa is not None
+                        and term_gpa_strike.test_tier(term_gpa)
+                    )
+                    else None
+                ),
+            )  # Regular strike
+            worksheet.cell(
+                row=start_row + i,
+                column=start_col + 7,
+                value=(
+                    "X"
+                    if (
+                        term_gpa is not None
+                        and term_gpa_super_strike.test_tier(term_gpa)
+                    )
+                    else None
+                ),
+            )  # Super strike
+
+        # Write course information
+        start_row = 4
+        for term in terms_list:
+            for course in member.terms[term].classes:
+                start_col = 1
+                for i, col_val in enumerate(
+                    (
+                        term,
+                        course.class_name,
+                        course.catalog_no,
+                        course.hrs,
+                        course.grade,
+                    )
+                ):
+                    worksheet.cell(
+                        row=start_row,
+                        column=start_col + i,
+                        value=col_val,
+                    )
+                start_row += 1
+
+        # Add matplotlib plot PNG image of GPA over time to sheet
+        plot_image: Image.Image | None = plot_member_gpa(member)
+        if plot_image is not None:
+            plot = openpyxl.drawing.image.Image(plot_image)
+            plot.anchor = "N4"
+            worksheet.add_image(plot)
+
+    workbook.remove(workbook["template"])  # remove blank template sheet
+
+    workbook.save(individual_report_save_path)
+    if open_on_finish:
+        os.startfile(individual_report_save_path)
 
     return

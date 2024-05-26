@@ -10,7 +10,7 @@ import sqlite3
 
 from .config import db_path, default_roster_csv_path, grade_report_dir
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__ + "db_funcs")
 
 
 def create_db_conn() -> sqlite3.Connection:
@@ -69,7 +69,6 @@ def create_db_conn() -> sqlite3.Connection:
                 "class",
                 "catalog_num",
                 "hrs",
-                "grade",
                 "grade_type"
             ) ON CONFLICT REPLACE
         );"""

@@ -64,12 +64,17 @@ def main():
     )
 
     parser.add_argument(
-        "--report",
+        "--term-report",
         action="store",
         type=str,
         help="generate grade report for a term, (eg. SPXXXX, FSXXXX)",
         metavar="TERM",
         nargs="?",
+    )
+    parser.add_argument(
+        "--individual-report",
+        action="store_true",
+        help="generate a report for all members, including strike info",
     )
     parser.add_argument(
         "--checklist",
@@ -87,11 +92,14 @@ def main():
         metavar="TERM",
         nargs="?",
     )
+
     args = parser.parse_args()
 
-    if args.report is not None:
+    if args.term_report is not None:
         validate_term(args.report)
         sctkpy.reports.generate_grade_report(term=args.report)
+    if args.individual_report is not None:
+        sctkpy.reports.generate_individual_academic_report()
     if args.checklist is not None:
         validate_term(args.checklist)
         sctkpy.reports.generate_study_check_sheet(term=args.checklist)

@@ -123,8 +123,18 @@ class Member:
                     ), f"error in column: {column}"
             except AssertionError as exc:
                 logger.error(
-                    "Parent of multi-valued data is not redundant as expected"
+                    "%s: "
+                    + "Parent of multi-valued data is not "
+                    + "redundant as expected",
+                    exc,
                 )
+                logger.error("\tError in data for %s:", self.name)
+                for column in single_value_column_names:
+                    logger.error(
+                        "\t\t%s: %s",
+                        column,
+                        ",".join([str(row[column]) for row in rows]),
+                    )
                 raise exc
 
             if rows[0]["new_member"] == "Y":
@@ -205,11 +215,103 @@ class Member:
         logger.debug("Previous term is: %s", selected_term)
         return selected_term if selected_term in term_list else None
 
-    def study_hours(self, selected_term: str) -> tuple[str, float | None, str]:
+    def calculate_gpa(
+        self, terms: list[Term], raw_gpa: bool = True
+    ) -> float | None:
+        """Calculates GPA
+
+        Args:
+            terms (list[Term]):
+                list of terms to calculate GPA from
+            raw_gpa (bool, optional):
+                Do not compensate for part-time status semesters.
+                Defaults to False.
+
+        Returns:
+            float | None: GPA value
+        """
+        sum_points = 0
+        sum_credits = 0
+        for term in terms:
+            for course in term.classes:
+                grade_point: int | None = gpa_map[course.grade]
+                if grade_point is not None:
+                    sum_points += grade_point * course.hrs
+                    sum_credits += course.hrs
+
+                    logger.debug(
+                        '\t\tCourse Info: %s %s %s, %i hrs, grade="%s", '
+                        + "(grade point: %s, weight (grade point x hrs): %s)",
+                        term.term,
+                        course.class_name,
+                        course.catalog_no,
+                        course.hrs,
+                        course.grade,
+                        str(grade_point),
+                        (
+                            str(grade_point * course.hrs)
+                            if grade_point is not None
+                            else "None"
+                        ),
+                    )
+                else:
+                    logger.warning(
+                        '\t\tCannot use course: %s %s %s, %i hrs, grade="%s"',
+                        term.term,
+                        course.class_name,
+                        course.catalog_no,
+                        course.hrs,
+                        course.grade,
+                    )
+            if (not raw_gpa) and (
+                sum_credits < FULL_TIME_HOURS
+            ):  # if member has less that full-time status, use previous
+                # semester grade data until they have enough hrs to be
+                logger.warning(
+                    "\t%s is in < %i credit hours (%i), "
+                    + "trying to add previous term.",
+                    self.name,
+                    FULL_TIME_HOURS,
+                    sum_credits,
+                )
+
+                previous_term = self.get_prev_term(selected_term=term.term)
+                logger.warning("Using previous term: %s", previous_term)
+
+                if previous_term is not None:
+                    terms.append(self.terms[previous_term])
+                else:
+                    logger.warning("Previous term does not exist")
+                    break
+
+        if sum_credits == 0:
+            logger.warning(
+                "\t%s is in 0 credit hours, unable to calculate GPA", self.name
+            )
+            return None
+
+        gpa: float = sum_points / sum_credits
+        logger.debug(
+            "\t%s's GPA = %i / %i = (sum grade points / sum credit hrs) = %f",
+            self.name,
+            sum_points,
+            sum_credits,
+            gpa,
+        )
+
+        return gpa
+
+    def study_hours(
+        self, selected_term: str, raw_gpa: bool = True
+    ) -> tuple[str, float | None, str]:
         """Calculate GPA and Study Hours status for a member in a given term
 
         Args:
-            selected_term (str): Term to calculate study hour status from
+            selected_term (str):
+                Term to calculate study hour status from
+            raw_gpa (bool, optional):
+                Do not compensate for part-time status semesters.
+                Defaults to False.
 
         Returns:
             tuple[float | None, str]:
@@ -254,74 +356,11 @@ class Member:
                 return (selected_term, None, result)
 
         terms = [self.terms[selected_term]]
-        sum_points = 0
-        sum_credits = 0
-        for term in terms:
-            for course in term.classes:
-                grade_point: int | None = gpa_map[course.grade]
-                if grade_point is not None:
-                    sum_points += grade_point * course.hrs
-                    sum_credits += course.hrs
 
-                    logger.debug(
-                        '\t\tCourse Info: %s %s %s, %i hrs, grade="%s", '
-                        + "(grade point: %s, weight (grade point x hrs): %s)",
-                        term.term,
-                        course.class_name,
-                        course.catalog_no,
-                        course.hrs,
-                        course.grade,
-                        str(grade_point),
-                        (
-                            str(grade_point * course.hrs)
-                            if grade_point is not None
-                            else "None"
-                        ),
-                    )
-                else:
-                    logger.debug(
-                        '\t\tCannot use course: %s %s %s, %i hrs, grade="%s"',
-                        term.term,
-                        course.class_name,
-                        course.catalog_no,
-                        course.hrs,
-                        course.grade,
-                    )
-            if (
-                sum_credits < FULL_TIME_HOURS
-            ):  # if member has less that full-time status, use previous
-                # semester grade data until they have enough hrs to be
-                logger.warning(
-                    "\t%s is in < %i credit hours (%i), "
-                    + "trying to add previous term.",
-                    self.name,
-                    FULL_TIME_HOURS,
-                    sum_credits,
-                )
+        gpa = self.calculate_gpa(terms=terms, raw_gpa=raw_gpa)
 
-                previous_term = self.get_prev_term(selected_term=term.term)
-                logger.warning("Using previous term: %s", previous_term)
-
-                if previous_term is not None:
-                    terms.append(self.terms[previous_term])
-                else:
-                    logger.warning("Previous term does not exist")
-                    break
-
-        if sum_credits == 0:
-            logger.warning(
-                "\t%s is in 0 credit hours, unable to calculate GPA", self.name
-            )
-            return (selected_term, None, "")
-
-        gpa: float = sum_points / sum_credits
-        logger.debug(
-            "\t%s's GPA = %i / %i = (sum grade points / sum credit hrs) = %f",
-            self.name,
-            sum_points,
-            sum_credits,
-            gpa,
-        )
+        if gpa is None:
+            return (selected_term, gpa, "")
 
         outcomes = []
         if no_study_hours.test_tier(gpa):
@@ -372,3 +411,34 @@ class Member:
             result if result != "" else "No Study Hours",
         )
         return ([term.term for term in terms][-1], gpa, result)
+
+    def generate_academic_report(
+        self,
+    ) -> tuple[list[str], list[float | None], list[float | None]]:
+        """Get term and cumulative GPA for each term
+
+        Returns:
+            tuple[list[str], list[float | None], list[float | None]]:
+                tuple of lists of: terms, term gpa's, and cumulative gpa's
+        """
+        terms = sorted(
+            list(self.terms.keys()),
+            key=lambda term: (
+                int(term[2:]),
+                0 if term[:2] == "SP" else 1,
+            ),
+        )  # Sort terms in chronological order
+
+        term_gpas = [
+            self.calculate_gpa([self.terms[term]], raw_gpa=True)
+            for term in terms
+        ]
+
+        cumulative_gpas = [
+            self.calculate_gpa(
+                [self.terms[term] for term in terms[: i + 1]], raw_gpa=True
+            )
+            for i in range(len(terms))
+        ]
+
+        return terms, term_gpas, cumulative_gpas
