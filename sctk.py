@@ -27,8 +27,6 @@ def validate_term(term: str):
 
 def main():
     """Main function that handles argparse stuff"""
-    sctkpy.db_funcs.load_roster_into_db()
-    sctkpy.db_funcs.load_grades_into_db()
 
     parser = argparse.ArgumentParser(
         prog="sctkpy",
@@ -95,17 +93,22 @@ def main():
 
     args = parser.parse_args()
 
+    sctkpy.db_funcs.load_roster_into_db()
+    sctkpy.db_funcs.load_grades_into_db()
+
     if args.term_report is not None:
-        validate_term(args.report)
-        sctkpy.reports.generate_grade_report(term=args.report)
-    if args.individual_report is not None:
+        validate_term(args.term_report)
+        sctkpy.reports.generate_grade_report(term=args.term_report)
+    elif args.individual_report:
         sctkpy.reports.generate_individual_academic_report()
-    if args.checklist is not None:
+    elif args.checklist is not None:
         validate_term(args.checklist)
         sctkpy.reports.generate_study_check_sheet(term=args.checklist)
-    if args.files is not None:
+    elif args.files is not None:
         validate_term(args.files)
         sctkpy.reports.generate_files_responsibility_report(term=args.files)
+    else:
+        return
 
     return
 
