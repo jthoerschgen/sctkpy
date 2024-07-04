@@ -48,13 +48,15 @@ if __name__ == "__main__":
         ),  # Test all potential grades, all but A,B,C,D,F shouldn't affect GPA
     ]
 
-    for term, grades in [
+    test_data = [
         ("FS2023", ["B", "B", "B", "B", "B"]),  # 3.00 GPA
         ("SP2024", ["A", "A", "A", "D", "D"]),  # 2.80 GPA
         ("FS2024", ["A", "A", "B", "D", "D"]),  # 2.60 GPA
         ("SP2025", ["A", "A", "C", "C", "C", "D"]),  # 2.50 GPA
         ("FS2025", ["A", "A", "A", "F", "F"]),  # 2.40 GPA
-    ]:
+    ]
+    test_data.reverse()
+    for term, grades in test_data:
         test_terms.append(
             sctkpy.member.Term(
                 term=term,
@@ -93,3 +95,6 @@ if __name__ == "__main__":
     for term in test_terms:
         ret_term, gpa, study_hour_status = test_member.study_hours(term.term)
         logger.debug("GPA: %f, Status: %s", gpa, study_hour_status)
+        print(
+            f"GPA: {gpa}, Status: {study_hour_status}",
+        )

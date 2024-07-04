@@ -150,6 +150,109 @@ social_probation = StudyHourTier(
     desc_out_house="Social Probation",
 )
 
+
+reduce_two_tiers = StudyHourTier(
+    bound=3.50,
+    condition=">=",
+    result_in_house=no_study_hours.result_in_house,
+    desc_in_house=no_study_hours.desc_in_house,
+    result_out_house=no_study_hours.result_out_house,
+    desc_out_house=no_study_hours.desc_out_house,
+)
+
+
+def get_reduce_one_tier(previous_gpa: float) -> StudyHourTier:
+    """Make StudyHourTier object for testing if study hours can be reduced by
+    one tier.
+
+    Args:
+        previous_gpa (float): GPA from the previous term.
+
+    Returns:
+        StudyHourTier: Depending on the given previous GPA, the outcome will
+            either be reduced from:
+                tier two -> tier one or tier one -> no study hours.
+    """
+    return StudyHourTier(
+        bound=3.00,
+        condition=">=",
+        result_in_house=(
+            tier_one.result_in_house
+            if tier_two.test_tier(previous_gpa)
+            else no_study_hours.result_in_house
+        ),
+        desc_in_house=(
+            tier_one.desc_in_house
+            if tier_two.test_tier(previous_gpa)
+            else no_study_hours.desc_in_house
+        ),
+        result_out_house=(
+            tier_one.result_out_house
+            if tier_two.test_tier(previous_gpa)
+            else no_study_hours.result_out_house
+        ),
+        desc_out_house=(
+            tier_one.desc_out_house
+            if tier_two.test_tier(previous_gpa)
+            else no_study_hours.desc_out_house
+        ),
+    )
+
+
+def get_reduce_two_tiers() -> StudyHourTier:
+    """Make StudyHourTier object for testing if study hours can be reduced by
+    two tiers.
+
+    Returns:
+        StudyHourTier: Depending on the given previous GPA, the outcome will
+        either reduce two study hour tiers or not.
+    """
+    return StudyHourTier(
+        bound=3.50,
+        condition=">=",
+        result_in_house=no_study_hours.result_in_house,
+        desc_in_house=no_study_hours.desc_in_house,
+        result_out_house=no_study_hours.result_out_house,
+        desc_out_house=no_study_hours.desc_out_house,
+    )
+
+
+def get_reduce_no_punting() -> StudyHourTier:
+    """Make StudyHourTier object for testing if punting privileges can be
+    restored.
+
+    Returns:
+        StudyHourTier: Depending on the given previous GPA, the outcome will
+        either restore punting privileges or not.
+    """
+    return StudyHourTier(
+        bound=3.00,
+        condition=">=",
+        result_in_house="",
+        desc_in_house="",
+        result_out_house="",
+        desc_out_house="",
+    )
+
+
+def get_reduce_social_probation() -> StudyHourTier:
+    """Make StudyHourTier object for testing if academic social probation can
+    be lifted.
+
+    Returns:
+        StudyHourTier: Depending on the given previous GPA, the outcome will
+        either lift academic social probation or not.
+    """
+    return StudyHourTier(
+        bound=3.25,
+        condition=">=",
+        result_in_house="",
+        desc_in_house="",
+        result_out_house="",
+        desc_out_house="",
+    )
+
+
 """Strike GPA Tiers
 """
 

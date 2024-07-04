@@ -56,21 +56,30 @@ def generate_grade_report(term: str, open_on_finish: bool = True) -> None:
     statistics_data: dict = {"pledge_class": [], "gpa": []}
 
     for i, member in enumerate(members):  # Write columns
-        ret_term, term_gpa, study_hours = member.study_hours(term)
+        (
+            (selected_term, term_gpa),
+            (previous_term, previous_gpa),
+            study_hours,
+        ) = member.study_hours(term)
 
         if term_gpa is not None:
             statistics_data["pledge_class"].append(member.pledge_class)
             statistics_data["gpa"].append(term_gpa)
 
-        rounded_term_gpa = (
+        rounded_term_gpa: float | None = (
             float(f"{term_gpa:.3f}") if term_gpa is not None else None
+        )
+        rounded_previous_gpa: float | None = (
+            float(f"{previous_gpa:.3f}") if previous_gpa is not None else None
         )
 
         for j, datum in enumerate(
             (
                 member.name,
-                ret_term,
                 member.pledge_class,
+                previous_term,
+                rounded_previous_gpa,
+                selected_term,
                 rounded_term_gpa,
                 study_hours,
             )
@@ -86,7 +95,7 @@ def generate_grade_report(term: str, open_on_finish: bool = True) -> None:
         statistics_data["gpa"]
     )
     start_row = 17
-    start_col = 9
+    start_col = 11
     worksheet.cell(
         row=start_row, column=start_col, value=f"{house_avg_gpa:.3f}"
     )
@@ -98,7 +107,7 @@ def generate_grade_report(term: str, open_on_finish: bool = True) -> None:
 
     # Pledge class average GPA
     start_row = 21
-    start_col = 7
+    start_col = 9
     for i, pledge_class in enumerate(unique_pledge_classes):
         pc_grade_data = [
             statistics_data["gpa"][i]
@@ -121,7 +130,7 @@ def generate_grade_report(term: str, open_on_finish: bool = True) -> None:
     # Add hidden numbers used for comparison in the xlsx conditional formatting
     # In column F, yellow => tier one (F4), red => tier two (F5).
     start_row = 4
-    start_col = 6
+    start_col = 8
     for i, option in enumerate((tier_one, tier_two)):
         worksheet.cell(
             row=start_row + i,
@@ -131,7 +140,7 @@ def generate_grade_report(term: str, open_on_finish: bool = True) -> None:
 
     # In-House - Key Info
     start_row = 4
-    start_col = 7
+    start_col = 9
     for i, option in enumerate(
         (no_study_hours, tier_one, tier_two, no_punting)
     ):
@@ -153,7 +162,7 @@ def generate_grade_report(term: str, open_on_finish: bool = True) -> None:
 
     # Out-House - Key Info
     start_row = 10
-    start_col = 7
+    start_col = 9
     for i, option in enumerate((no_study_hours, tier_one, tier_two)):
         worksheet.cell(
             row=start_row + i,
@@ -173,7 +182,7 @@ def generate_grade_report(term: str, open_on_finish: bool = True) -> None:
 
     # Social Probation - Key Info
     start_row = 15
-    start_col = 7
+    start_col = 9
     option = social_probation
     worksheet.cell(
         row=start_row,
@@ -214,7 +223,7 @@ def generate_study_check_sheet(term: str, open_on_finish: bool = True) -> None:
     workbook = openpyxl.load_workbook(filename=study_checks_save_path)
     worksheet = workbook.active
 
-    worksheet.cell(row=1, column=1, value=f"{term} Week of:")
+    worksheet.cell(row=1, column=1, value="Week of:")
 
     start_row = 3
     start_col = 1

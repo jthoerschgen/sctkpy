@@ -8,7 +8,10 @@ import re
 import sqlite3
 
 from .config import (
-    FULL_TIME_HOURS,
+    get_reduce_no_punting,
+    get_reduce_one_tier,
+    get_reduce_social_probation,
+    get_reduce_two_tiers,
     gpa_map,
     no_punting,
     no_study_hours,
@@ -179,7 +182,7 @@ class Member:
                     logger.debug("\t\t%s: %s", key, val)
         return
 
-    def get_prev_term(self, selected_term: str) -> str | None:
+    def get_previous_term(self, selected_term: str) -> str | None:
         """Given a term in a format SPXXXX or FSXXXX, (e.g. FS2021, SP2022)
         return the previous term if it exists
 
@@ -193,15 +196,15 @@ class Member:
         term_list = sorted(
             [term for term in self.terms.keys()],
             key=lambda term: (
-                (
-                    (int(term[2:])),
-                    (not term[:2]),
-                ),
+                int(term[2:]),
+                0 if term[:2] == "SP" else 1,
             ),
         )  # Sort list by year and then by term, (SP before FS)
         logger.debug("Terms: %s", term_list)
         if len(term_list) == 0:
             logger.debug("Cannot get previous term for %s", selected_term)
+            return None
+        if selected_term == term_list[0]:  # first term has no previous term
             return None
         while int(selected_term[2:]) > int(term_list[0][2:]) and not (
             selected_term[:2] < term_list[0][:2]
@@ -215,21 +218,21 @@ class Member:
         logger.debug("Previous term is: %s", selected_term)
         return selected_term if selected_term in term_list else None
 
-    def calculate_gpa(
-        self, terms: list[Term], raw_gpa: bool = True
-    ) -> float | None:
+    def calculate_gpa(self, terms: list[Term]) -> float | None:
         """Calculates GPA
 
         Args:
             terms (list[Term]):
                 list of terms to calculate GPA from
-            raw_gpa (bool, optional):
-                Do not compensate for part-time status semesters.
-                Defaults to False.
 
         Returns:
             float | None: GPA value
         """
+        logger.debug(
+            "Calculating %s's GPA for: %s",
+            self.name,
+            [term.term for term in terms],
+        )
         sum_points = 0
         sum_credits = 0
         for term in terms:
@@ -263,26 +266,6 @@ class Member:
                         course.hrs,
                         course.grade,
                     )
-            if (not raw_gpa) and (
-                sum_credits < FULL_TIME_HOURS
-            ):  # if member has less that full-time status, use previous
-                # semester grade data until they have enough hrs to be
-                logger.warning(
-                    "\t%s is in < %i credit hours (%i), "
-                    + "trying to add previous term.",
-                    self.name,
-                    FULL_TIME_HOURS,
-                    sum_credits,
-                )
-
-                previous_term = self.get_prev_term(selected_term=term.term)
-                logger.warning("Using previous term: %s", previous_term)
-
-                if previous_term is not None:
-                    terms.append(self.terms[previous_term])
-                else:
-                    logger.warning("Previous term does not exist")
-                    break
 
         if sum_credits == 0:
             logger.warning(
@@ -302,8 +285,8 @@ class Member:
         return gpa
 
     def study_hours(
-        self, selected_term: str, raw_gpa: bool = True
-    ) -> tuple[str, float | None, str]:
+        self, selected_term: str
+    ) -> tuple[tuple[str, float | None], tuple[str | None, float | None], str]:
         """Calculate GPA and Study Hours status for a member in a given term
 
         Args:
@@ -314,9 +297,12 @@ class Member:
                 Defaults to False.
 
         Returns:
-            tuple[float | None, str]:
-                Tuple of (GPA, Study Hour Status) or (None, Empty String) if
-                member does not have sufficient data for the input term.
+            tuple[str, float | None, str]:
+                Tuple of (Term, GPA, Study Hour Status) or (Term, None, Empty
+                String) if member does not have sufficient data for the input
+                term.
+
+        TODO: handle co-op semesters, better handle study hour evaluation
         """
         logger.debug("%s", "~" * 50)
         logger.debug(
@@ -327,73 +313,166 @@ class Member:
         )
         logger.debug("%s", "~" * 50)
 
-        if selected_term not in self.terms.keys():
-            logger.warning(
-                "%s has no data for term: %s", self.name, selected_term
+        # original_selected_term: str = selected_term
+        previous_term: str | None = self.get_previous_term(selected_term)
+
+        while previous_term is not None and (
+            selected_term not in self.terms.keys()
+        ):
+            logging.debug(
+                "\tCan't find the selected term: %s, getting previous term...",
+                selected_term,
             )
+            selected_term = previous_term
+            previous_term = self.get_previous_term(selected_term)
+        if selected_term not in self.terms.keys():
+            return ((selected_term, None), (previous_term, None), "")
 
-            previous_term = self.get_prev_term(selected_term=selected_term)
-            logger.warning("Using previous term: %s", previous_term)
+        previous_gpa: float | None = None
 
-            if previous_term is not None:
-                return self.study_hours(previous_term)
+        while previous_gpa is None and previous_term is not None:
+            previous_gpa = self.calculate_gpa(
+                terms=[self.terms[previous_term]]
+            )
+            if previous_gpa is None:
+                previous_term = self.get_previous_term(previous_term)
 
-            else:  # If no previous term exists, member must be new
-                logger.debug("\t%s is a new member", self.name)
-                outcomes = [tier_two, no_punting]  # Pledges shall study
+        gpa: float | None = self.calculate_gpa(
+            terms=[self.terms[selected_term]]
+        )
+        if gpa is None and previous_term is not None:
+            return self.study_hours(previous_term)
 
-                # Combine study hour restrictions into a single string
-                result = " ".join(
-                    [
-                        (
-                            outcome.result_out_house
-                            if self.out_of_house
-                            else outcome.result_in_house
-                        )
-                        for outcome in outcomes
-                    ]
-                )
-                return (selected_term, None, result)
+        assert gpa is not None  # GPA should never be None past this point.
 
-        terms = [self.terms[selected_term]]
-
-        gpa = self.calculate_gpa(terms=terms, raw_gpa=raw_gpa)
-
-        if gpa is None:
-            return (selected_term, gpa, "")
+        logger.debug(
+            "\t\tPrevious Term: %s, GPA: %s",
+            previous_term if previous_term else None,
+            previous_gpa if previous_gpa else None,
+        )
+        logger.debug("\t\tCurrent Term:  %s, GPA: %f", selected_term, gpa)
 
         outcomes = []
-        if no_study_hours.test_tier(gpa):
-            outcomes.append(no_study_hours)
-        elif tier_one.test_tier(gpa) and not tier_two.test_tier(gpa):
-            outcomes.append(tier_one)
-        elif tier_two.test_tier(gpa):
-            outcomes.append(tier_two)
+        if previous_gpa is None or no_study_hours.test_tier(previous_gpa):
+            # Member was either not on study hours the previous semester or
+            # does not have data for a previous semester -> nothing special
+            # with determining study hour status.
+            if no_study_hours.test_tier(gpa):
+                outcomes.append(no_study_hours)
+            elif tier_two.test_tier(gpa):
+                outcomes.append(tier_two)
+            elif tier_one.test_tier(gpa):
+                outcomes.append(tier_one)
 
-        if no_punting.test_tier(gpa):
-            outcomes.append(no_punting)
+            if no_punting.test_tier(gpa):
+                outcomes.append(no_punting)
 
-        if len(terms) == 1 and terms[0].new_member:  # Pledges shall study
-            logger.debug("\t%s is a new member", self.name)
-            outcomes = [tier_two, no_punting]
+            # if self.terms[selected_term].new_member and (
+            #     selected_term == original_selected_term
+            # ):  # Pledges shall study
+            #     logger.debug("\t%s is a new member", self.name)
+            #     outcomes = [tier_two, no_punting]
+
+        else:
+            # Member was on study hours the previous semester, if the member's
+            # GPA has improved then check if its meets the threshold to reduce
+            # study hours, if the member's GPA did not improve, then calculate
+            # their study hours normally.
+            if previous_gpa < gpa:
+                logger.debug("\t\tGPA improved, trying reduction...")
+                if tier_two.test_tier(previous_gpa):
+                    logger.debug(
+                        "\t\tPreviously Had Tier Two (%s)...",
+                        (
+                            tier_two.desc_out_house
+                            if self.out_of_house
+                            else tier_two.desc_in_house
+                        ),
+                    )
+                    if get_reduce_two_tiers().test_tier(gpa):
+                        logger.debug(
+                            "\t\t\tReducing 2 Tiers, GPA: %f %s %f",
+                            gpa,
+                            get_reduce_two_tiers().condition,
+                            get_reduce_two_tiers().bound,
+                        )
+                        outcomes.append(get_reduce_two_tiers())
+                    elif get_reduce_one_tier(previous_gpa).test_tier(gpa):
+                        logger.debug(
+                            "\t\t\tReducing 1 Tier, GPA: %f %s %f",
+                            gpa,
+                            get_reduce_one_tier(previous_gpa).condition,
+                            get_reduce_one_tier(previous_gpa).bound,
+                        )
+                        outcomes.append(get_reduce_one_tier(previous_gpa))
+                    else:
+                        logger.debug(
+                            "\t\t\tReducing 0 Tiers, GPA: %f not %s %f",
+                            gpa,
+                            get_reduce_one_tier(previous_gpa).condition,
+                            get_reduce_one_tier(previous_gpa).bound,
+                        )
+                        outcomes.append(tier_two)
+                elif tier_one.test_tier(previous_gpa):
+                    logger.debug(
+                        "\t\tPreviously Had Tier One (%s)...",
+                        (
+                            tier_one.desc_out_house
+                            if self.out_of_house
+                            else tier_one.desc_in_house
+                        ),
+                    )
+                    if get_reduce_one_tier(previous_gpa).test_tier(gpa):
+                        logger.debug(
+                            "\t\t\tReducing 1 Tier, GPA: %f %s %f",
+                            gpa,
+                            get_reduce_one_tier(previous_gpa).condition,
+                            get_reduce_one_tier(previous_gpa).bound,
+                        )
+                        outcomes.append(get_reduce_one_tier(previous_gpa))
+                    else:
+                        logger.debug(
+                            "\t\t\tReducing 0 Tiers, GPA: %f not %s %f",
+                            gpa,
+                            get_reduce_one_tier(previous_gpa).condition,
+                            get_reduce_one_tier(previous_gpa).bound,
+                        )
+                        outcomes.append(tier_one)
+
+                if no_punting.test_tier(previous_gpa):
+                    logger.debug("\t\tPreviously Had No Punting...")
+                    if get_reduce_no_punting().test_tier(gpa):
+                        logger.debug(
+                            "\t\t\tReducing No Punting, GPA: %f %s %f",
+                            gpa,
+                            get_reduce_no_punting().condition,
+                            get_reduce_no_punting().bound,
+                        )
+                    else:
+                        logger.debug(
+                            "\t\t\tCan't Reduce No Punting, GPA: %f not %s %f",
+                            gpa,
+                            get_reduce_no_punting().condition,
+                            get_reduce_no_punting().bound,
+                        )
+                        outcomes.append(no_punting)
+            else:
+                logger.debug(
+                    "\t\tGPA didn't improve (%f < %f). Cannot reduce tiers...",
+                    gpa,
+                    previous_gpa,
+                )
+                if tier_two.test_tier(gpa):
+                    outcomes.append(tier_two)
+                elif tier_one.test_tier(gpa):
+                    outcomes.append(tier_one)
+
+                if no_punting.test_tier(gpa):
+                    outcomes.append(no_punting)
 
         if social_probation.test_tier(gpa):
             outcomes.append(social_probation)
 
-        for outcome in outcomes:
-            logger.debug(
-                "\t%s has a GPA %s %f: %s",
-                self.name,
-                outcome.condition,
-                outcome.bound,
-                (
-                    outcome.result_out_house
-                    if self.out_of_house
-                    else outcome.result_in_house
-                ),
-            )
-
-        # Combine study hour restrictions into a single string
         result = " ".join(
             [
                 (
@@ -404,13 +483,11 @@ class Member:
                 for outcome in outcomes
             ]
         )
-        logger.debug(
-            "\t%s, GPA: %.3f, Outcome: %s",
-            self.name,
-            gpa,
-            result if result != "" else "No Study Hours",
-        )
-        return ([term.term for term in terms][-1], gpa, result)
+
+        logger.debug("\tFinal Report for: %s", self.name)
+        logger.debug("\t\tResult: %s", result)
+
+        return (selected_term, gpa), (previous_term, previous_gpa), result
 
     def generate_academic_report(
         self,
@@ -429,15 +506,10 @@ class Member:
             ),
         )  # Sort terms in chronological order
 
-        term_gpas = [
-            self.calculate_gpa([self.terms[term]], raw_gpa=True)
-            for term in terms
-        ]
+        term_gpas = [self.calculate_gpa([self.terms[term]]) for term in terms]
 
         cumulative_gpas = [
-            self.calculate_gpa(
-                [self.terms[term] for term in terms[: i + 1]], raw_gpa=True
-            )
+            self.calculate_gpa([self.terms[term] for term in terms[: i + 1]])
             for i in range(len(terms))
         ]
 
