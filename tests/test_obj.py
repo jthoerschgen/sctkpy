@@ -4,79 +4,142 @@ import logging
 
 from context import sctkpy
 
+import sctkpy.config
 import sctkpy.member
+
+reduce_no_punting = sctkpy.config.reduce_no_punting
+reduce_one_tier = sctkpy.config.reduce_one_tier
+reduce_social_probation = sctkpy.config.reduce_social_probation
+reduce_two_tiers = sctkpy.config.reduce_two_tiers
+
+no_punting = sctkpy.config.no_punting
+no_study_hours = sctkpy.config.no_study_hours
+social_probation = sctkpy.config.social_probation
+tier_one = sctkpy.config.tier_one
+tier_two = sctkpy.config.tier_two
 
 logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     logger.debug("Testing Member Object")
-    # generate example courses
-    classes = []
-    for grade in sctkpy.config.gpa_map.keys():
-        classes.append(
-            sctkpy.member.Class(f"{grade} Class", f"100{grade}", 3, grade)
+
+    # Testing GPA revaluations
+    term_null: list[sctkpy.member.Class] = [
+        sctkpy.member.Class(
+            class_name="", catalog_no="", hrs=3, grade=letter_grade
         )
+        for letter_grade in ["I", "I", "I", "I"]
+    ]
+
+    term_2_50: list[sctkpy.member.Class] = [
+        sctkpy.member.Class(
+            class_name="", catalog_no="", hrs=3, grade=letter_grade
+        )
+        for letter_grade in ["B", "B", "C", "C"]
+    ]
+
+    term_2_75: list[sctkpy.member.Class] = [
+        sctkpy.member.Class(
+            class_name="", catalog_no="", hrs=3, grade=letter_grade
+        )
+        for letter_grade in ["B", "B", "B", "C"]
+    ]
+
+    term_3_00: list[sctkpy.member.Class] = [
+        sctkpy.member.Class(
+            class_name="", catalog_no="", hrs=3, grade=letter_grade
+        )
+        for letter_grade in ["B", "B", "B", "B"]
+    ]
+
+    term_3_50: list[sctkpy.member.Class] = [
+        sctkpy.member.Class(
+            class_name="", catalog_no="", hrs=3, grade=letter_grade
+        )
+        for letter_grade in ["A", "A", "B", "B"]
+    ]
 
     test_terms = [
         sctkpy.member.Term(
-            term="FS2021",
+            term=("FS" if (i % 2 == 0) else "SP") + str(2020 + (i + 1 // 2)),
             chapter="Beta Sigma Psi",
-            new_member=True,
+            new_member=True if i == 0 else False,
             priv_gpa=0.00,
             priv_cum_gpa=0.00,
             term_gpa=0.00,
             term_cum_gpa=0.00,
-            classes=[
-                sctkpy.member.Class(
-                    f"{sctkpy.config.gpa_map['A']} Class",
-                    f"100{sctkpy.config.gpa_map['A']}",
-                    3,
-                    "A",
-                )
+            classes=test_classes,
+        )
+        for i, test_classes in enumerate(
+            [
+                term_3_50,  # 1
+                term_2_50,  # 2
+                term_2_75,  # 3
+                term_2_75,  # 4
+                term_3_50,  # 5
+                term_2_75,  # 6
+                term_3_00,  # 7
+                term_2_50,  # 8
+                term_3_00,  # 9
+                term_null,  # 10
+                term_2_50,  # 11
+                term_3_00,  # 12
+                term_2_75,  # 13
+                term_3_00,  # 14
+                term_2_75,  # 15
+                term_2_75,  # 16
+                term_2_50,  # 17
+                term_2_50,  # 18
+                term_3_00,  # 19
+                term_2_75,  # 20
             ]
-            * 5,
-        ),  # New member with 4.00 GPA
-        sctkpy.member.Term(
-            term="SP2022",
-            chapter="Beta Sigma Psi",
-            new_member=False,
-            priv_gpa=0.00,
-            priv_cum_gpa=0.00,
-            term_gpa=0.00,
-            term_cum_gpa=0.00,
-            classes=classes,
-        ),  # Test all potential grades, all but A,B,C,D,F shouldn't affect GPA
+        )
     ]
 
-    test_data = [
-        ("FS2023", ["B", "B", "B", "B", "B"]),  # 3.00 GPA
-        ("SP2024", ["A", "A", "A", "D", "D"]),  # 2.80 GPA
-        ("FS2024", ["A", "A", "B", "D", "D"]),  # 2.60 GPA
-        ("SP2025", ["A", "A", "C", "C", "C", "D"]),  # 2.50 GPA
-        ("FS2025", ["A", "A", "A", "F", "F"]),  # 2.40 GPA
+    expected_results = [
+        no_study_hours.result_in_house,  # 1
+        tier_two.result_in_house + " " + no_punting.result_in_house,  # 2
+        tier_two.result_in_house + " " + no_punting.result_in_house,  # 3
+        tier_two.result_in_house + " " + no_punting.result_in_house,  # 4
+        no_study_hours.result_in_house,  # 5
+        tier_one.result_in_house,  # 6
+        no_study_hours.result_in_house,  # 7
+        tier_two.result_in_house + " " + no_punting.result_in_house,  # 8
+        tier_one.result_in_house,  # 9
+        tier_one.result_in_house,  # 10
+        tier_two.result_in_house + " " + no_punting.result_in_house,  # 11
+        tier_one.result_in_house,  # 12
+        tier_one.result_in_house,  # 13
+        no_study_hours.result_in_house,  # 14
+        tier_one.result_in_house,  # 15
+        tier_one.result_in_house,  # 16
+        tier_two.result_in_house + " " + no_punting.result_in_house,  # 17
+        tier_two.result_in_house + " " + no_punting.result_in_house,  # 18
+        tier_one.result_in_house,  # 19
+        tier_one.result_in_house,  # 20
     ]
-    test_data.reverse()
-    for term, grades in test_data:
-        test_terms.append(
-            sctkpy.member.Term(
-                term=term,
-                chapter="Beta Sigma Psi",
-                new_member=False,
-                priv_gpa=0.00,
-                priv_cum_gpa=0.00,
-                term_gpa=0.00,
-                term_cum_gpa=0.00,
-                classes=[
-                    sctkpy.member.Class(
-                        f"{sctkpy.config.gpa_map[grade]} Class",
-                        f"100{sctkpy.config.gpa_map[grade]}",
-                        3,
-                        grade,
-                    )
-                    for grade in grades
-                ],
-            ),
-        )
+    # expected_results = [
+    #     no_study_hours.result_in_house,  # 1
+    #     tier_two.result_in_house,  # 2
+    #     tier_two.result_in_house,  # 3
+    #     tier_two.result_in_house,  # 4
+    #     no_study_hours.result_in_house,  # 5
+    #     tier_one.result_in_house,  # 6
+    #     no_study_hours.result_in_house,  # 7
+    #     tier_two.result_in_house,  # 8
+    #     tier_one.result_in_house,  # 9
+    #     tier_one.result_in_house,  # 10
+    #     tier_two.result_in_house,  # 11
+    #     tier_one.result_in_house,  # 12
+    #     tier_one.result_in_house,  # 13
+    #     no_study_hours.result_in_house,  # 14
+    #     tier_one.result_in_house,  # 15
+    #     tier_one.result_in_house,  # 16
+    #     tier_two.result_in_house,  # 17
+    #     tier_two.result_in_house,  # 18
+    #     tier_one.result_in_house,  # 19
+    #     tier_one.result_in_house,  # 20
+    # ]
 
     test_member = sctkpy.member.Member(
         name="First Last",
@@ -84,17 +147,11 @@ if __name__ == "__main__":
         terms={test_term.term: test_term for test_term in test_terms},
     )
 
-    logger.debug("Name:         %s", test_member.name)
-    logger.debug("Out of House: %s", test_member.out_of_house)
-    logger.debug("Terms:        %s", test_member.terms.keys())
-    for term in test_member.terms.keys():
-        logger.debug("\tTerm: %s", term)
-        for course in test_member.terms[term].classes:
-            logger.debug("\t\tClass: %s", course.__dict__)
-
-    for term in test_terms:
-        ret_term, gpa, study_hour_status = test_member.study_hours(term.term)
-        logger.debug("GPA: %f, Status: %s", gpa, study_hour_status)
-        print(
-            f"GPA: {gpa}, Status: {study_hour_status}",
+    for i, term in enumerate(test_member.terms):
+        (_, gpa), (previous_term, previous_gpa), result = (
+            test_member.study_hours(term)
         )
+        print(f"#{i + 1}\tTerm: {term},\tGPA: {gpa},\tResult: {result}")
+        assert (
+            result == expected_results[i]
+        ), f"#{i + 1}\t{result} != {expected_results[i]}"

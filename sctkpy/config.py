@@ -160,6 +160,42 @@ reduce_two_tiers = StudyHourTier(
     desc_out_house=no_study_hours.desc_out_house,
 )
 
+reduce_one_tier = StudyHourTier(
+    bound=3.00,
+    condition=">=",
+    result_in_house="",
+    desc_in_house="",
+    result_out_house="",
+    desc_out_house="",
+)
+
+reduce_two_tiers = StudyHourTier(
+    bound=3.50,
+    condition=">=",
+    result_in_house="",
+    desc_in_house="",
+    result_out_house="",
+    desc_out_house="",
+)
+
+reduce_no_punting = StudyHourTier(
+    bound=3.00,
+    condition=">=",
+    result_in_house="",
+    desc_in_house="",
+    result_out_house="",
+    desc_out_house="",
+)
+
+reduce_social_probation = StudyHourTier(
+    bound=3.25,
+    condition=">=",
+    result_in_house="",
+    desc_in_house="",
+    result_out_house="",
+    desc_out_house="",
+)
+
 
 def get_reduce_one_tier(previous_gpa: float) -> StudyHourTier:
     """Make StudyHourTier object for testing if study hours can be reduced by
