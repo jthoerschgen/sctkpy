@@ -14,12 +14,18 @@ from PIL import Image
 from tqdm import tqdm
 
 from .config import (  # cumulative_gpa_strike,
+    academic_suspension_cumulative,
+    academic_suspension_term,
     files_hit_list_template_path,
     grade_report_template_path,
     individual_report_template_path,
     no_punting,
     no_study_hours,
     proj_root_dir,
+    reduce_no_punting,
+    reduce_one_tier,
+    reduce_social_probation,
+    reduce_two_tiers,
     social_probation,
     study_checks_template_path,
     term_gpa_strike,
@@ -53,18 +59,24 @@ def generate_grade_report(term: str, open_on_finish: bool = True) -> None:
     start_col = 1
     members: list[Member] = get_member_info()
 
-    statistics_data: dict = {"pledge_class": [], "gpa": []}
+    statistics_data: dict = {"pledge_class": [], "gpa": [], "prev_gpa": []}
 
     for i, member in enumerate(members):  # Write columns
         (
             (selected_term, term_gpa),
             (previous_term, previous_gpa),
             study_hours,
+            cumulative_gpa,
         ) = member.study_hours(term)
 
         if term_gpa is not None:
-            statistics_data["pledge_class"].append(member.pledge_class)
+            statistics_data["pledge_class"].append(
+                member.pledge_class
+                if member.pledge_class[:2] != "SP"
+                else f"FS{int(member.pledge_class[2:])-1}"
+            )
             statistics_data["gpa"].append(term_gpa)
+            statistics_data["prev_gpa"].append(previous_gpa)
 
         rounded_term_gpa: float | None = (
             float(f"{term_gpa:.3f}") if term_gpa is not None else None
@@ -77,6 +89,7 @@ def generate_grade_report(term: str, open_on_finish: bool = True) -> None:
             (
                 member.name,
                 member.pledge_class,
+                cumulative_gpa,
                 previous_term,
                 rounded_previous_gpa,
                 selected_term,
@@ -91,13 +104,17 @@ def generate_grade_report(term: str, open_on_finish: bool = True) -> None:
     # House GPA Statistics
 
     # Whole house average GPA
-    house_avg_gpa: float = sum(statistics_data["gpa"]) / len(
-        statistics_data["gpa"]
+    house_avg_gpa: float = (
+        sum(statistics_data["gpa"]) / len(statistics_data["gpa"])
+        if len(statistics_data["gpa"]) > 0
+        else None
     )
-    start_row = 17
-    start_col = 11
+    start_row = 26
+    start_col = 14
     worksheet.cell(
-        row=start_row, column=start_col, value=f"{house_avg_gpa:.3f}"
+        row=start_row,
+        column=start_col,
+        value=f"{house_avg_gpa:.3f}" if house_avg_gpa is not None else None,
     )
 
     unique_pledge_classes = []
@@ -106,15 +123,30 @@ def generate_grade_report(term: str, open_on_finish: bool = True) -> None:
             unique_pledge_classes.append(pledge_class)
 
     # Pledge class average GPA
-    start_row = 21
-    start_col = 9
+    start_row = 30
+    start_col = 10
+    pc_avg_grades: dict[str:float] = {}
     for i, pledge_class in enumerate(unique_pledge_classes):
-        pc_grade_data = [
+        pc_grade_data: list[float] = [
             statistics_data["gpa"][i]
             for i, pc in enumerate(statistics_data["pledge_class"])
             if pc == pledge_class
         ]
-        pc_avg_grade = sum(pc_grade_data) / len(pc_grade_data)
+        pc_avg_grade: float = sum(pc_grade_data) / len(pc_grade_data)
+
+        pc_avg_grades[pledge_class] = pc_avg_grade
+
+        prev_pc_grade_data: list[float] = [
+            statistics_data["prev_gpa"][i]
+            for i, pc in enumerate(statistics_data["pledge_class"])
+            if pc == pledge_class
+            and statistics_data["prev_gpa"][i] is not None
+        ]
+        prev_pc_avg_grade: float = (
+            sum(prev_pc_grade_data) / len(prev_pc_grade_data)
+            if len(prev_pc_grade_data) > 0
+            else None
+        )
 
         # Write data
         worksheet.cell(row=start_row + i, column=start_col, value=pledge_class)
@@ -126,11 +158,41 @@ def generate_grade_report(term: str, open_on_finish: bool = True) -> None:
             column=start_col + 2,
             value=f"{pc_avg_grade:.3f}",
         )
+        worksheet.cell(
+            row=start_row + i,
+            column=start_col + 3,
+            value=(
+                f"{prev_pc_avg_grade:.3f}"
+                if prev_pc_avg_grade is not None
+                else ""
+            ),
+        )
+        worksheet.cell(
+            row=start_row + i,
+            column=start_col + 4,
+            value=(
+                f"{(pc_avg_grade - prev_pc_avg_grade):.3f}"
+                if prev_pc_avg_grade is not None
+                else ""
+            ),
+        )
+    pc_avg_grade_ranks: dict[str, int] = {
+        key: rank
+        for rank, key in enumerate(
+            sorted(pc_avg_grades, key=pc_avg_grades.get, reverse=True), 1
+        )
+    }
+    for i, pledge_class in enumerate(unique_pledge_classes):
+        worksheet.cell(
+            row=start_row + i,
+            column=start_col + 5,
+            value=f"{pc_avg_grade_ranks[pledge_class]}",
+        )
 
-    # Add hidden numbers used for comparison in the xlsx conditional formatting
+    # Add hidden numbers used for comparison with conditional formatting
     # In column F, yellow => tier one (F4), red => tier two (F5).
     start_row = 4
-    start_col = 8
+    start_col = 9
     for i, option in enumerate((tier_one, tier_two)):
         worksheet.cell(
             row=start_row + i,
@@ -140,7 +202,7 @@ def generate_grade_report(term: str, open_on_finish: bool = True) -> None:
 
     # In-House - Key Info
     start_row = 4
-    start_col = 9
+    start_col = 10
     for i, option in enumerate(
         (no_study_hours, tier_one, tier_two, no_punting)
     ):
@@ -151,18 +213,18 @@ def generate_grade_report(term: str, open_on_finish: bool = True) -> None:
         )
         worksheet.cell(
             row=start_row + i,
-            column=start_col + 1,
+            column=start_col + 3,
             value=option.result_in_house,
         )
         worksheet.cell(
             row=start_row + i,
-            column=start_col + 2,
+            column=start_col + 4,
             value=f"GPA {option.condition} {option.bound}",
         )
 
     # Out-House - Key Info
     start_row = 10
-    start_col = 9
+    start_col = 10
     for i, option in enumerate((no_study_hours, tier_one, tier_two)):
         worksheet.cell(
             row=start_row + i,
@@ -171,34 +233,71 @@ def generate_grade_report(term: str, open_on_finish: bool = True) -> None:
         )
         worksheet.cell(
             row=start_row + i,
-            column=start_col + 1,
+            column=start_col + 3,
             value=option.result_out_house,
         )
         worksheet.cell(
             row=start_row + i,
-            column=start_col + 2,
+            column=start_col + 4,
             value=f"GPA {option.condition} {option.bound}",
         )
 
     # Social Probation - Key Info
     start_row = 15
-    start_col = 9
-    option = social_probation
-    worksheet.cell(
-        row=start_row,
-        column=start_col,
-        value=option.desc_in_house,
-    )
-    worksheet.cell(
-        row=start_row,
-        column=start_col + 1,
-        value=option.result_in_house,
-    )
-    worksheet.cell(
-        row=start_row,
-        column=start_col + 2,
-        value=f"GPA {option.condition} {option.bound}",
-    )
+    start_col = 10
+    for i, option in enumerate(
+        (
+            social_probation,
+            academic_suspension_term,
+            academic_suspension_cumulative,
+        )
+    ):
+        worksheet.cell(
+            row=start_row + i,
+            column=start_col,
+            value=option.desc_in_house,
+        )
+        worksheet.cell(
+            row=start_row + i,
+            column=start_col + 3,
+            value=option.result_in_house,
+        )
+        worksheet.cell(
+            row=start_row + i,
+            column=start_col + 4,
+            value=f"GPA {option.condition} {option.bound}",
+        )
+
+    # Reduce Study Hour Sanctions - Key Info
+    start_row = 21
+    start_col = 10
+    for i, option in enumerate(
+        (
+            reduce_one_tier,
+            reduce_two_tiers,
+            reduce_no_punting,
+            reduce_social_probation,
+        )
+    ):
+        worksheet.cell(
+            row=start_row + i,
+            column=start_col,
+            value=option.description,
+        )
+        worksheet.cell(
+            row=start_row + i,
+            column=start_col + 2,
+            value=f"GPA {option.current.condition} {option.current.bound}",
+        )
+        worksheet.cell(
+            row=start_row + i,
+            column=start_col + 4,
+            value=(
+                f"GPA {option.cumulative.condition} {option.cumulative.bound}"
+                if option.cumulative is not None
+                else ""
+            ),
+        )
 
     workbook.save(grade_report_save_path)
     if open_on_finish:
@@ -231,7 +330,7 @@ def generate_study_check_sheet(term: str, open_on_finish: bool = True) -> None:
 
     i = 0
     for member in members:  # Write columns
-        _, _, study_hours = member.study_hours(term)
+        _, _, study_hours, _ = member.study_hours(term)
         if len(study_hours) > 0 and not member.out_of_house:
             worksheet.cell(
                 row=start_row + i, column=start_col, value=member.name

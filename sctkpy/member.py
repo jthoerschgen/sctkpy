@@ -9,6 +9,8 @@ import sqlite3
 
 from .config import (
     StudyHourTier,
+    academic_suspension_cumulative,
+    academic_suspension_term,
     gpa_map,
     no_punting,
     no_study_hours,
@@ -206,17 +208,27 @@ class Member:
             return None
         if selected_term == term_list[0]:  # First term has no previous term.
             return None
-        while int(selected_term[2:]) > int(term_list[0][2:]) and not (
-            selected_term[:2] < term_list[0][:2]
-        ):
-            if selected_term[:2] == "FS":
-                selected_term = "SP" + selected_term[2:]
+
+        first_year: int = int(term_list[0][2:])
+
+        year: int = int(selected_term[2:])
+        term: str = selected_term[:2]
+
+        returned_term: str = f"{term}{year}"
+        while year >= first_year:
+            if term == "FS":
+                term = "SP"
+            elif term == "SP":
+                term = "FS"
+                year = year - 1
             else:
-                selected_term = "FS" + str(int(selected_term[2:]) - 1)
-            if selected_term in term_list:
+                assert term in ("SP", "FS"), term
+
+            returned_term = f"{term}{year}"
+            if returned_term in term_list and returned_term != selected_term:
                 break
         logger.debug("Previous term is: %s", selected_term)
-        return selected_term if selected_term in term_list else None
+        return returned_term if returned_term in term_list else None
 
     def calculate_gpa(self, terms: list[Term]) -> float | None:
         """Calculates GPA of a list of terms.
@@ -300,7 +312,6 @@ class Member:
         previous_gpa: float | None = None
 
         while previous_gpa is None and previous_term is not None:
-            print(previous_term, previous_gpa)
             previous_gpa = self.calculate_gpa(
                 terms=[self.terms[previous_term]]
             )
@@ -308,9 +319,12 @@ class Member:
                 previous_term = self.get_previous_term(previous_term)
         return previous_gpa, previous_term
 
-    def study_hours(
-        self, selected_term: str
-    ) -> tuple[tuple[str, float | None], tuple[str | None, float | None], str]:
+    def study_hours(self, selected_term: str) -> tuple[
+        tuple[str, float | None],
+        tuple[str | None, float | None],
+        str,
+        float | None,
+    ]:
         """Calculate GPA and Study Hours status for a member in a given term.
 
         Args:
@@ -321,8 +335,9 @@ class Member:
                 tuple[str, float | None], tuple[str | None, float | None], str
             ]:
                 First tuple[str, float | None]: selected term and GPA.
-                First tuple[str, float | None]: previous term and GPA.
+                Second tuple[str, float | None]: previous term and GPA.
                 str: Study Hours outcome for the selected term.
+                float: Cumulative GPA for the selected term.
         """
         logger.debug("%s", "~" * 50)
         logger.debug(
@@ -345,7 +360,9 @@ class Member:
             selected_term = previous_term
             previous_term = self.get_previous_term(selected_term)
         if selected_term not in self.terms.keys():
-            return ((selected_term, None), (previous_term, None), "")
+            return ((selected_term, None), (previous_term, None), "", None)
+        if previous_term == selected_term:
+            previous_term = self.get_previous_term(selected_term)
 
         # Find the GPA of the selected term.
         current_gpa: float | None = self.calculate_gpa(
@@ -355,7 +372,7 @@ class Member:
             return self.study_hours(previous_term)
 
         logger.debug(
-            "\t\tCurrent Term:  %s, GPA: %f", selected_term, current_gpa
+            "\tCurrent Term:  %s, GPA: %f", selected_term, current_gpa
         )
 
         assert (
@@ -367,6 +384,41 @@ class Member:
         previous_gpa, previous_term = self.get_next_previous_gpa_and_term(
             previous_term
         )
+
+        logger.debug(
+            "\tPrevious Term:  %s, GPA: %s", previous_term, str(previous_gpa)
+        )
+
+        # Determine social probation status.
+        logger.debug("Determining Social Probation Status...")
+        has_social_probation: bool = False
+        if previous_gpa is None and social_probation.test_tier(current_gpa):
+            has_social_probation = True
+
+        current_gpa_copy = current_gpa
+        previous_gpa_copy = previous_gpa
+        previous_term_copy = previous_term
+        while previous_term_copy is not None:
+
+            logger.debug(
+                "\t\tPrevious Term: %s, GPA: %s",
+                previous_term_copy,
+                previous_gpa_copy,
+            )
+            if previous_gpa_copy is None:
+                break
+
+            if reduce_social_probation.test_tier(current_gpa_copy):
+                break
+            elif social_probation.test_tier(current_gpa_copy):
+                has_social_probation = True
+                break
+
+            current_gpa_copy = previous_gpa_copy
+            previous_term_copy = self.get_previous_term(previous_term_copy)
+            previous_gpa_copy, previous_term_copy = (
+                self.get_next_previous_gpa_and_term(previous_term_copy)
+            )
 
         # Calculate Study Hour Tier.
         # Method for determining Study Hour Tier:
@@ -383,6 +435,7 @@ class Member:
 
         # Create copies of values for use in the loop.
         current_gpa_copy = current_gpa
+        current_term_copy = selected_term
         previous_gpa_copy = previous_gpa
         previous_term_copy = previous_term
         while previous_term_copy is not None:
@@ -398,13 +451,15 @@ class Member:
             if tier_two.test_tier(
                 previous_gpa_copy
             ):  # Previously had tier two.
-                if reduce_two_tiers.test_tier(
-                    current_gpa_copy
+                if reduce_two_tiers.test_tier_cumulative(
+                    current_gpa_copy,
+                    cumulative_gpa=self.terms[current_term_copy].term_cum_gpa,
                 ):  # Can reduce two tiers from tier two, now no study hours.
                     tier = 0
                     break
-                elif reduce_one_tier.test_tier(
-                    current_gpa_copy
+                elif reduce_one_tier.test_tier_cumulative(
+                    current_gpa_copy,
+                    cumulative_gpa=self.terms[current_term_copy].term_cum_gpa,
                 ):  # Can reduce one tier from tier two, now tier one.
                     tier = 1
 
@@ -415,8 +470,9 @@ class Member:
             elif tier_one.test_tier(
                 previous_gpa_copy
             ):  # Previously had tier one.
-                if reduce_one_tier.test_tier(
-                    current_gpa_copy
+                if reduce_one_tier.test_tier_cumulative(
+                    current_gpa_copy,
+                    cumulative_gpa=self.terms[current_term_copy].term_cum_gpa,
                 ):  # Can reduce one tier from tier one, now no study hours.
                     tier = 0
                     break
@@ -446,6 +502,7 @@ class Member:
             logger.debug("\t\t\tEnding Tier: %i", tier)
 
             current_gpa_copy = previous_gpa_copy
+            current_term_copy = previous_term_copy
             previous_term_copy = self.get_previous_term(previous_term_copy)
             previous_gpa_copy, previous_term_copy = (
                 self.get_next_previous_gpa_and_term(previous_term_copy)
@@ -460,14 +517,23 @@ class Member:
         # Based off the tier of study hours from the previous semester,
         # attempt to reduce and assign appropriate outcome.
         if tier == 2 or tier_two.test_tier(current_gpa):
-            if reduce_two_tiers.test_tier(current_gpa):
+            if reduce_two_tiers.test_tier_cumulative(
+                current_gpa,
+                cumulative_gpa=self.terms[selected_term].term_cum_gpa,
+            ):
                 outcomes.append(no_study_hours)
-            elif reduce_one_tier.test_tier(current_gpa):
+            elif reduce_one_tier.test_tier_cumulative(
+                current_gpa,
+                cumulative_gpa=self.terms[selected_term].term_cum_gpa,
+            ):
                 outcomes.append(tier_one)
             else:
                 outcomes.append(tier_two)
         elif tier == 1 or tier_one.test_tier(current_gpa):
-            if reduce_one_tier.test_tier(current_gpa):
+            if reduce_one_tier.test_tier_cumulative(
+                current_gpa,
+                cumulative_gpa=self.terms[selected_term].term_cum_gpa,
+            ):
                 outcomes.append(no_study_hours)
             else:
                 outcomes.append(tier_one)
@@ -503,10 +569,44 @@ class Member:
                 self.get_next_previous_gpa_and_term(previous_term_copy)
             )
 
-        # Determine social probation status.
-        logger.debug("Determining Social Probation Status...")
-        if social_probation.test_tier(current_gpa):
+        if has_social_probation:
             outcomes.append(social_probation)
+
+        # Determine Academic Suspension
+        logger.debug("Determining Academic Suspension...")
+        if academic_suspension_term.test_tier(
+            current_gpa
+        ) or academic_suspension_cumulative.test_tier(
+            self.terms[selected_term].term_cum_gpa
+        ):
+            logger.debug(
+                "\t\tPrevious Term: %s, GPA: %s",
+                previous_term,
+                previous_gpa,
+            )
+            logger.debug(
+                "\t\tCurrent Term: %s, GPA: %s",
+                selected_term,
+                current_gpa,
+            )
+
+            if academic_suspension_term.test_tier(current_gpa):
+                logger.debug(
+                    "\t\tMember on Academic Suspension, Term GPA %s %f",
+                    academic_suspension_term.condition,
+                    academic_suspension_term.bound,
+                )
+                outcomes.append(academic_suspension_term)
+
+            elif academic_suspension_cumulative.test_tier(
+                self.terms[selected_term].term_cum_gpa
+            ):
+                logger.debug(
+                    "\t\tMember on Academic Suspension, Cumulative GPA %s %f",
+                    academic_suspension_term.condition,
+                    academic_suspension_term.bound,
+                )
+                outcomes.append(academic_suspension_cumulative)
 
         outcome_results: list[str] = [
             (
@@ -517,11 +617,13 @@ class Member:
             for outcome in outcomes
         ]
         result: str = " ".join(outcome_results)
+        logger.debug("\tOUTCOME: %s", outcome_results)
 
         return (
             (selected_term, current_gpa),
             (previous_term, previous_gpa),
             result,
+            self.terms[selected_term].term_cum_gpa,
         )
 
     def generate_academic_report(

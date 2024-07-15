@@ -77,14 +77,15 @@ class StudyHourTier:
         Returns:
             bool: If the tier applies to the given GPA
         """
-        assert (
-            gpa >= 0.00 and gpa <= 4.00
-        ), "Threshold is for GPA, must be between 0.00-4.00"
+        assert gpa >= 0.00 and gpa <= 4.00, (
+            "Threshold is for GPA, must be between 0.00-4.00"
+            + f", received {gpa}"
+        )
         return self.compare(x=gpa, y=self.bound)
 
 
 class StrikeTier(StudyHourTier):
-    """Child class of StudyHourTier"""
+    """Child class of StudyHourTier that handles strikes."""
 
     def __init__(
         self,
@@ -105,6 +106,72 @@ class StrikeTier(StudyHourTier):
             desc_out_house,
         )
         self.num_chances: int = num_chances
+
+
+class ReduceStudyHourTier:
+    """Class of StudyHourTiers that handles reducing study hours."""
+
+    def __init__(
+        self,
+        bound: float,
+        condition: str,
+        cum_bound: float | None,
+        cum_condition: str | None,
+        description: str,
+    ):
+        self.current = StudyHourTier(
+            bound,
+            condition,
+            "",
+            "",
+            "",
+            "",
+        )
+        self.cumulative = (
+            StudyHourTier(
+                cum_bound,
+                cum_condition,
+                "",
+                "",
+                "",
+                "",
+            )
+            if cum_bound is not None and cum_condition is not None
+            else None
+        )
+        self.description = description
+
+    def test_tier(self, gpa: float):
+        """Use test tier function using default logic with just self.current"""
+        return self.current.test_tier(gpa)
+
+    def test_tier_cumulative(self, gpa: float, cumulative_gpa: float) -> bool:
+        """Given a GPA and cumulative GPA as an input, will return a boolean
+        value indicating if the the study hour tier can be reduced.
+
+        Args:
+            gpa (float): GPA value between 0.00-4.00
+
+        Returns:
+            bool: If the tier applies to the given GPA
+        """
+        assert gpa >= 0.00 and gpa <= 4.00, (
+            "Threshold is for GPA, must be between 0.00-4.00"
+            + f", received {gpa}"
+        )
+        assert cumulative_gpa >= 0.00 and cumulative_gpa <= 4.00, (
+            "Threshold is for Cumulative GPA, must be between 0.00-4.00"
+            + f"received {cumulative_gpa}"
+        )
+
+        if self.cumulative is None:
+            return self.test_tier(gpa)
+        else:
+            return self.current.compare(
+                x=gpa, y=self.current.bound
+            ) and self.cumulative.compare(
+                x=cumulative_gpa, y=self.cumulative.bound
+            )
 
 
 """Study Hour GPA Tiers
@@ -150,143 +217,58 @@ social_probation = StudyHourTier(
     desc_out_house="Social Probation",
 )
 
+academic_suspension_term = StudyHourTier(
+    bound=2.20,
+    condition="<",
+    result_in_house="SU",
+    desc_in_house="Academic Suspension (Term GPA)",
+    result_out_house="SU",
+    desc_out_house="Academic Suspension (Term GPA)",
+)
 
-reduce_two_tiers = StudyHourTier(
+academic_suspension_cumulative = StudyHourTier(
+    bound=2.50,
+    condition="<",
+    result_in_house="SU",
+    desc_in_house="Academic Suspension (Cum. GPA)",
+    result_out_house="SU",
+    desc_out_house="Academic Suspension (Cum. GPA)",
+)
+
+"""Study Hour Reductions
+"""
+
+reduce_two_tiers = ReduceStudyHourTier(
     bound=3.50,
     condition=">=",
-    result_in_house=no_study_hours.result_in_house,
-    desc_in_house=no_study_hours.desc_in_house,
-    result_out_house=no_study_hours.result_out_house,
-    desc_out_house=no_study_hours.desc_out_house,
+    cum_bound=2.75,
+    cum_condition=">=",
+    description="All Study Hours",
 )
 
-reduce_one_tier = StudyHourTier(
+reduce_one_tier = ReduceStudyHourTier(
     bound=3.00,
     condition=">=",
-    result_in_house="",
-    desc_in_house="",
-    result_out_house="",
-    desc_out_house="",
+    cum_bound=2.75,
+    cum_condition=">=",
+    description="Half Study Hours",
 )
 
-reduce_two_tiers = StudyHourTier(
-    bound=3.50,
-    condition=">=",
-    result_in_house="",
-    desc_in_house="",
-    result_out_house="",
-    desc_out_house="",
-)
-
-reduce_no_punting = StudyHourTier(
+reduce_no_punting = ReduceStudyHourTier(
     bound=3.00,
     condition=">=",
-    result_in_house="",
-    desc_in_house="",
-    result_out_house="",
-    desc_out_house="",
+    cum_bound=None,
+    cum_condition=None,
+    description=no_punting.desc_in_house,
 )
 
-reduce_social_probation = StudyHourTier(
+reduce_social_probation = ReduceStudyHourTier(
     bound=3.25,
     condition=">=",
-    result_in_house="",
-    desc_in_house="",
-    result_out_house="",
-    desc_out_house="",
+    cum_bound=None,
+    cum_condition=None,
+    description=social_probation.desc_in_house,
 )
-
-
-def get_reduce_one_tier(previous_gpa: float) -> StudyHourTier:
-    """Make StudyHourTier object for testing if study hours can be reduced by
-    one tier.
-
-    Args:
-        previous_gpa (float): GPA from the previous term.
-
-    Returns:
-        StudyHourTier: Depending on the given previous GPA, the outcome will
-            either be reduced from:
-                tier two -> tier one or tier one -> no study hours.
-    """
-    return StudyHourTier(
-        bound=3.00,
-        condition=">=",
-        result_in_house=(
-            tier_one.result_in_house
-            if tier_two.test_tier(previous_gpa)
-            else no_study_hours.result_in_house
-        ),
-        desc_in_house=(
-            tier_one.desc_in_house
-            if tier_two.test_tier(previous_gpa)
-            else no_study_hours.desc_in_house
-        ),
-        result_out_house=(
-            tier_one.result_out_house
-            if tier_two.test_tier(previous_gpa)
-            else no_study_hours.result_out_house
-        ),
-        desc_out_house=(
-            tier_one.desc_out_house
-            if tier_two.test_tier(previous_gpa)
-            else no_study_hours.desc_out_house
-        ),
-    )
-
-
-def get_reduce_two_tiers() -> StudyHourTier:
-    """Make StudyHourTier object for testing if study hours can be reduced by
-    two tiers.
-
-    Returns:
-        StudyHourTier: Depending on the given previous GPA, the outcome will
-        either reduce two study hour tiers or not.
-    """
-    return StudyHourTier(
-        bound=3.50,
-        condition=">=",
-        result_in_house=no_study_hours.result_in_house,
-        desc_in_house=no_study_hours.desc_in_house,
-        result_out_house=no_study_hours.result_out_house,
-        desc_out_house=no_study_hours.desc_out_house,
-    )
-
-
-def get_reduce_no_punting() -> StudyHourTier:
-    """Make StudyHourTier object for testing if punting privileges can be
-    restored.
-
-    Returns:
-        StudyHourTier: Depending on the given previous GPA, the outcome will
-        either restore punting privileges or not.
-    """
-    return StudyHourTier(
-        bound=3.00,
-        condition=">=",
-        result_in_house="",
-        desc_in_house="",
-        result_out_house="",
-        desc_out_house="",
-    )
-
-
-def get_reduce_social_probation() -> StudyHourTier:
-    """Make StudyHourTier object for testing if academic social probation can
-    be lifted.
-
-    Returns:
-        StudyHourTier: Depending on the given previous GPA, the outcome will
-        either lift academic social probation or not.
-    """
-    return StudyHourTier(
-        bound=3.25,
-        condition=">=",
-        result_in_house="",
-        desc_in_house="",
-        result_out_house="",
-        desc_out_house="",
-    )
 
 
 """Strike GPA Tiers
