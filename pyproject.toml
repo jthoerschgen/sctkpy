@@ -1,0 +1,25 @@
+[tool.black]
+line-length = 79
+
+[tool.flake8]
+max-line-length = 79
+exclude = ["__pycache__"]
+extend-ignore = []        # Put any PEP 8 Style Guide Exceptions Here
+
+[tool.isort]
+profile = "black"
+line_length = 79
+known_third_party = ["flask", "requests"]
+skip = ["__pycache__"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+show_error_codes = true
+
+[tool.pydoclint]
+style = 'google'
+exclude = '\.git|\.tox|tests/data|some_script\.py'
+require-return-section-when-returning-nothing = true
+
