@@ -1,0 +1,105 @@
+[tier.no_study_hours]
+bound = 3.00
+condition = ">="
+result_in_house = ""
+description_in_house = "0 Hours Nightly"
+result_out_house = ""
+description_out_house = "0 Hours Weekly"
+
+[tier.tier_one]
+bound = 3.00
+condition = "<"
+result_in_house = "2"
+description_in_house = "2 Hours Nightly (Sun-Thu)"
+result_out_house = "5 Weekly"
+description_out_house = "5 Hours Weekly"
+
+[tier.tier_two]
+bound = 2.75
+condition = "<"
+result_in_house = "4"
+description_in_house = "4 Hours Nightly (Sun-Thu)"
+result_out_house = "10 Weekly"
+description_out_house = "10 Hours Weekly"
+
+[tier.no_punting]
+bound = 2.60
+condition = "<"
+result_in_house = "NP"
+description_in_house = "No Punting"
+result_out_house = ""
+description_out_house = ""
+
+[tier.social_probation]
+bound = 2.50
+condition = "<"
+result_in_house = "SP"
+description_in_house = "Social Probation"
+result_out_house = "SP"
+description_out_house = "Social Probation"
+
+[tier.reduce_two_tiers]
+term_bound = 3.50
+term_condition = ">="
+cumulative_bound = 2.75
+cumulative_condition = ">="
+description_in_house = "Reduce 4 Study Hours"
+description_out_house = "Reduce 10 Study Hours Weekly"
+
+[tier.reduce_one_tier]
+term_bound = 3.00
+term_condition = ">="
+cumulative_bound = 2.75
+cumulative_condition = ">="
+description_in_house = "Reduce 2 Study Hours"
+description_out_house = "Reduce 5 Study Hours Weekly"
+
+[tier.get_off_no_punting]
+bound = 3.00
+condition = ">="
+result_in_house = ""
+description_in_house = "Get off of No Punting"
+result_out_house = ""
+description_out_house = ""
+
+[tier.get_off_social_probation]
+bound = 3.25
+condition = ">="
+result_in_house = ""
+description_in_house = "Get off of Social Probation"
+result_out_house = ""
+description_out_house = "Get off of Social Probation"
+
+[tier.academic_suspension_term]
+bound = 2.20
+condition = "<"
+result_in_house = "SU"
+description_in_house = "Academic Suspension (Term GPA)"
+result_out_house = "SU"
+description_out_house = "Academic Suspension (Term GPA)"
+
+[tier.academic_suspension_cumulative]
+bound = 2.50
+condition = "<"
+result_in_house = "SU"
+description_in_house = "Academic Suspension (Cum. GPA)"
+result_out_house = "SU"
+description_out_house = "Academic Suspension (Cum. GPA)"
+
+[tier.strike]
+bound = 2.50
+condition = "<"
+result_in_house = "Strike"
+description_in_house = "Strike (Term GPA)"
+result_out_house = "Strike"
+description_out_house = "Strike (Term GPA)"
+number_chances = 3
+
+[tier.super_strike]
+bound = 1.75
+condition = "<"
+result_in_house = "Super Strike"
+description_in_house = "Super Strike (Term GPA)"
+result_out_house = "Super Strike"
+description_out_house = "Super Strike (Term GPA)"
+number_chances = 2

@@ -1,310 +1,13 @@
-# -*- coding: utf-8 -*-
+"""Configuration for the project."""
 
-"""config.py
-Desc: Configurable variables used by the project
-"""
 import os
+import tomllib
 
-FULL_TIME_HOURS = 12  # hours to be considered a full-time student
-
-gpa_map: dict[str | None, int | None] = {
-    "A": 4,
-    "B": 3,
-    "C": 2,
-    "D": 1,
-    "F": 0,
-    "I": None,
-    "S": None,
-    "U": None,
-    "DL": None,
-    "Y": None,
-    "WD": None,
-    "": None,
-    None: None,
-}  # Map for letter to points, where the letter = key, number of points = value
-
-
-class StudyHourTier:
-    """Object for managing logic related to calculating what study hours a
-    member would have."""
-
-    def __init__(
-        self,
-        bound: float,
-        condition: str,
-        result_in_house: str,
-        desc_in_house: str,
-        result_out_house: str,
-        desc_out_house: str,
-    ):
-        self.bound = bound
-        self.condition = condition
-        self.result_in_house: str = result_in_house
-        self.desc_in_house: str = desc_in_house
-        self.result_out_house: str = result_out_house
-        self.desc_out_house: str = desc_out_house
-
-        assert (
-            bound >= 0.00 and bound <= 4.00
-        ), "Threshold is for GPA, must be between 0.00-4.00"
-
-        assert self.condition in [
-            "<",
-            "<=",
-            "==",
-            "!=",
-            ">",
-            ">=",
-        ], "Invalid condition"
-
-        compare_functions = {
-            "<": lambda x, y: x < y,
-            "<=": lambda x, y: x <= y,
-            "==": lambda x, y: x == y,
-            "!=": lambda x, y: x != y,
-            ">": lambda x, y: x > y,
-            ">=": lambda x, y: x >= y,
-        }
-        self.compare = compare_functions[self.condition]
-
-    def test_tier(self, gpa: float) -> bool:
-        """Given a GPA as an input, will return a boolean value indicating if
-        the StudyHourTier applies
-
-        Args:
-            gpa (float): GPA value between 0.00-4.00
-
-        Returns:
-            bool: If the tier applies to the given GPA
-        """
-        assert gpa >= 0.00 and gpa <= 4.00, (
-            "Threshold is for GPA, must be between 0.00-4.00"
-            + f", received {gpa}"
-        )
-        return self.compare(x=gpa, y=self.bound)
-
-
-class StrikeTier(StudyHourTier):
-    """Child class of StudyHourTier that handles strikes."""
-
-    def __init__(
-        self,
-        bound: float,
-        condition: str,
-        result_in_house: str,
-        desc_in_house: str,
-        result_out_house: str,
-        desc_out_house: str,
-        num_chances: int,
-    ):
-        super().__init__(
-            bound,
-            condition,
-            result_in_house,
-            desc_in_house,
-            result_out_house,
-            desc_out_house,
-        )
-        self.num_chances: int = num_chances
-
-
-class ReduceStudyHourTier:
-    """Class of StudyHourTiers that handles reducing study hours."""
-
-    def __init__(
-        self,
-        bound: float,
-        condition: str,
-        cum_bound: float | None,
-        cum_condition: str | None,
-        description: str,
-    ):
-        self.current = StudyHourTier(
-            bound,
-            condition,
-            "",
-            "",
-            "",
-            "",
-        )
-        self.cumulative = (
-            StudyHourTier(
-                cum_bound,
-                cum_condition,
-                "",
-                "",
-                "",
-                "",
-            )
-            if cum_bound is not None and cum_condition is not None
-            else None
-        )
-        self.description = description
-
-    def test_tier(self, gpa: float):
-        """Use test tier function using default logic with just self.current"""
-        return self.current.test_tier(gpa)
-
-    def test_tier_cumulative(self, gpa: float, cumulative_gpa: float) -> bool:
-        """Given a GPA and cumulative GPA as an input, will return a boolean
-        value indicating if the the study hour tier can be reduced.
-
-        Args:
-            gpa (float): GPA value between 0.00-4.00
-
-        Returns:
-            bool: If the tier applies to the given GPA
-        """
-        assert gpa >= 0.00 and gpa <= 4.00, (
-            "Threshold is for GPA, must be between 0.00-4.00"
-            + f", received {gpa}"
-        )
-        assert cumulative_gpa >= 0.00 and cumulative_gpa <= 4.00, (
-            "Threshold is for Cumulative GPA, must be between 0.00-4.00"
-            + f"received {cumulative_gpa}"
-        )
-
-        if self.cumulative is None:
-            return self.test_tier(gpa)
-        else:
-            return self.current.compare(
-                x=gpa, y=self.current.bound
-            ) and self.cumulative.compare(
-                x=cumulative_gpa, y=self.cumulative.bound
-            )
-
-
-"""Study Hour GPA Tiers
-"""
-no_study_hours = StudyHourTier(
-    bound=3.00,
-    condition=">=",
-    result_in_house="",
-    desc_in_house="0 Hours Nightly",
-    result_out_house="",
-    desc_out_house="0 Hours Weekly",
+from sctkpy.member.study_hour_tier import (
+    StrikeTier,
+    StudyHourTier,
+    StudyHourTierCumulative,
 )
-tier_one = StudyHourTier(
-    bound=3.00,
-    condition="<",
-    result_in_house="2",
-    desc_in_house="2 Hours Nightly (Sun-Thu)",
-    result_out_house="5 Weekly",
-    desc_out_house="5 Hours Weekly",
-)
-tier_two = StudyHourTier(
-    bound=2.75,
-    condition="<",
-    result_in_house="4",
-    desc_in_house="4 Hours Nightly (Sun-Thu)",
-    result_out_house="10 Weekly",
-    desc_out_house="10 Hours Weekly",
-)
-no_punting = StudyHourTier(
-    bound=2.60,
-    condition="<",
-    result_in_house="NP",
-    desc_in_house="No Punting",
-    result_out_house="",
-    desc_out_house="",
-)
-social_probation = StudyHourTier(
-    bound=2.50,
-    condition="<",
-    result_in_house="SP",
-    desc_in_house="Social Probation",
-    result_out_house="SP",
-    desc_out_house="Social Probation",
-)
-
-academic_suspension_term = StudyHourTier(
-    bound=2.20,
-    condition="<",
-    result_in_house="SU",
-    desc_in_house="Academic Suspension (Term GPA)",
-    result_out_house="SU",
-    desc_out_house="Academic Suspension (Term GPA)",
-)
-
-academic_suspension_cumulative = StudyHourTier(
-    bound=2.50,
-    condition="<",
-    result_in_house="SU",
-    desc_in_house="Academic Suspension (Cum. GPA)",
-    result_out_house="SU",
-    desc_out_house="Academic Suspension (Cum. GPA)",
-)
-
-"""Study Hour Reductions
-"""
-
-reduce_two_tiers = ReduceStudyHourTier(
-    bound=3.50,
-    condition=">=",
-    cum_bound=2.75,
-    cum_condition=">=",
-    description="All Study Hours",
-)
-
-reduce_one_tier = ReduceStudyHourTier(
-    bound=3.00,
-    condition=">=",
-    cum_bound=2.75,
-    cum_condition=">=",
-    description="Half Study Hours",
-)
-
-reduce_no_punting = ReduceStudyHourTier(
-    bound=3.00,
-    condition=">=",
-    cum_bound=None,
-    cum_condition=None,
-    description=no_punting.desc_in_house,
-)
-
-reduce_social_probation = ReduceStudyHourTier(
-    bound=3.25,
-    condition=">=",
-    cum_bound=None,
-    cum_condition=None,
-    description=social_probation.desc_in_house,
-)
-
-
-"""Strike GPA Tiers
-"""
-
-term_gpa_strike = StrikeTier(
-    bound=2.50,
-    condition="<",
-    result_in_house="",
-    desc_in_house="Strike (Term GPA)",
-    result_out_house="",
-    desc_out_house="Strike (Term GPA)",
-    num_chances=3,
-)
-
-term_gpa_super_strike = StrikeTier(
-    bound=1.75,
-    condition="<",
-    result_in_house="",
-    desc_in_house="Super Strike (Term GPA)",
-    result_out_house="",
-    desc_out_house="Super Strike (Term GPA)",
-    num_chances=2,
-)
-
-# cumulative_gpa_strike = StudyHourTier(
-#     bound=2.50,
-#     condition="<",
-#     result_in_house="",
-#     desc_in_house="Strike (Cumulative GPA)",
-#     result_out_house="",
-#     desc_out_house="Strike (Cumulative GPA)",
-# )
-
-"""Path variables
-"""
 
 proj_root_dir: str = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..")
@@ -314,18 +17,8 @@ assert os.path.isdir(proj_root_dir), f"{proj_root_dir}, is not a dir"
 app_dir: str = os.path.join(proj_root_dir, "sctkpy")
 assert os.path.isdir(app_dir), f"{app_dir}, is not a dir"
 
-grade_report_dir: str = os.path.join(proj_root_dir, "gradereports")
-if not os.path.exists(grade_report_dir):
-    os.mkdir(grade_report_dir)
-assert os.path.isdir(grade_report_dir), f"{grade_report_dir}, is not a dir"
-
 template_form_dir: str = os.path.join(app_dir, "templates")
 assert os.path.isdir(template_form_dir), f"{template_form_dir}, is not a dir"
-
-logs_dir: str = os.path.join(app_dir, "logs")
-if not os.path.exists(logs_dir):
-    os.mkdir(logs_dir)
-assert os.path.isdir(logs_dir), f"{logs_dir}, is not a dir"
 
 grade_report_template_path: str = os.path.join(
     template_form_dir, "grade_report_template.xlsx"
@@ -339,17 +32,199 @@ files_hit_list_template_path: str = os.path.join(
     template_form_dir, "files_hit_list_template.xlsx"
 )
 
-individual_report_template_path: str = os.path.join(
-    template_form_dir, "individual_grade_report_template.xlsx"
+member_report_template_path: str = os.path.join(
+    template_form_dir, "member_report_template.xlsx"
 )
 
-db_path: str = os.path.join(app_dir, "db", "sctkpy.db")
-if not os.path.exists(os.path.dirname(db_path)):
-    os.mkdir(os.path.dirname(db_path))
-assert os.path.isdir(
-    os.path.dirname(db_path)
-), f"{os.path.dirname(db_path)}, is not a dir"
+logs_dir: str = os.path.join(app_dir, "logs")
+if not os.path.exists(logs_dir):
+    os.mkdir(logs_dir)
+assert os.path.isdir(logs_dir), f"{logs_dir}, is not a dir"
 
-default_roster_csv_path: str = os.path.join(
-    proj_root_dir, "greeklife_roster_report.csv"
-)
+with open(os.path.join(app_dir, "config.toml"), mode="rb") as config_toml_file:
+    config = tomllib.load(config_toml_file)
+
+    no_study_hours = StudyHourTier(
+        bound=config["tier"]["no_study_hours"]["bound"],
+        condition=config["tier"]["no_study_hours"]["condition"],
+        result_in_house=config["tier"]["no_study_hours"]["result_in_house"],
+        description_in_house=config["tier"]["no_study_hours"][
+            "description_in_house"
+        ],
+        result_out_house=config["tier"]["no_study_hours"]["result_out_house"],
+        description_out_house=config["tier"]["no_study_hours"][
+            "description_out_house"
+        ],
+    )
+    tier_one = StudyHourTier(
+        bound=config["tier"]["tier_one"]["bound"],
+        condition=config["tier"]["tier_one"]["condition"],
+        result_in_house=config["tier"]["tier_one"]["result_in_house"],
+        description_in_house=config["tier"]["tier_one"][
+            "description_in_house"
+        ],
+        result_out_house=config["tier"]["tier_one"]["result_out_house"],
+        description_out_house=config["tier"]["tier_one"][
+            "description_out_house"
+        ],
+    )
+    tier_two = StudyHourTier(
+        bound=config["tier"]["tier_two"]["bound"],
+        condition=config["tier"]["tier_two"]["condition"],
+        result_in_house=config["tier"]["tier_two"]["result_in_house"],
+        description_in_house=config["tier"]["tier_two"][
+            "description_in_house"
+        ],
+        result_out_house=config["tier"]["tier_two"]["result_out_house"],
+        description_out_house=config["tier"]["tier_two"][
+            "description_out_house"
+        ],
+    )
+    no_punting = StudyHourTier(
+        bound=config["tier"]["no_punting"]["bound"],
+        condition=config["tier"]["no_punting"]["condition"],
+        result_in_house=config["tier"]["no_punting"]["result_in_house"],
+        description_in_house=config["tier"]["no_punting"][
+            "description_in_house"
+        ],
+        result_out_house=config["tier"]["no_punting"]["result_out_house"],
+        description_out_house=config["tier"]["no_punting"][
+            "description_out_house"
+        ],
+    )
+    social_probation = StudyHourTier(
+        bound=config["tier"]["social_probation"]["bound"],
+        condition=config["tier"]["social_probation"]["condition"],
+        result_in_house=config["tier"]["social_probation"]["result_in_house"],
+        description_in_house=config["tier"]["social_probation"][
+            "description_in_house"
+        ],
+        result_out_house=config["tier"]["social_probation"][
+            "result_out_house"
+        ],
+        description_out_house=config["tier"]["social_probation"][
+            "description_out_house"
+        ],
+    )
+
+    reduce_two_tiers = StudyHourTierCumulative(
+        term_bound=config["tier"]["reduce_two_tiers"]["term_bound"],
+        term_condition=config["tier"]["reduce_two_tiers"]["term_condition"],
+        cumulative_bound=config["tier"]["reduce_two_tiers"][
+            "cumulative_bound"
+        ],
+        cumulative_condition=config["tier"]["reduce_two_tiers"][
+            "cumulative_condition"
+        ],
+        description_in_house=config["tier"]["reduce_two_tiers"][
+            "description_in_house"
+        ],
+        description_out_house=config["tier"]["reduce_two_tiers"][
+            "description_out_house"
+        ],
+    )
+    reduce_one_tier = StudyHourTierCumulative(
+        term_bound=config["tier"]["reduce_one_tier"]["term_bound"],
+        term_condition=config["tier"]["reduce_one_tier"]["term_condition"],
+        cumulative_bound=config["tier"]["reduce_one_tier"]["cumulative_bound"],
+        cumulative_condition=config["tier"]["reduce_one_tier"][
+            "cumulative_condition"
+        ],
+        description_in_house=config["tier"]["reduce_one_tier"][
+            "description_in_house"
+        ],
+        description_out_house=config["tier"]["reduce_one_tier"][
+            "description_out_house"
+        ],
+    )
+    get_off_no_punting = StudyHourTier(
+        bound=config["tier"]["get_off_no_punting"]["bound"],
+        condition=config["tier"]["get_off_no_punting"]["condition"],
+        result_in_house=config["tier"]["get_off_no_punting"][
+            "result_in_house"
+        ],
+        description_in_house=config["tier"]["get_off_no_punting"][
+            "description_in_house"
+        ],
+        result_out_house=config["tier"]["get_off_no_punting"][
+            "result_out_house"
+        ],
+        description_out_house=config["tier"]["get_off_no_punting"][
+            "description_out_house"
+        ],
+    )
+    get_off_social_probation = StudyHourTier(
+        bound=config["tier"]["get_off_social_probation"]["bound"],
+        condition=config["tier"]["get_off_social_probation"]["condition"],
+        result_in_house=config["tier"]["get_off_social_probation"][
+            "result_in_house"
+        ],
+        description_in_house=config["tier"]["get_off_social_probation"][
+            "description_in_house"
+        ],
+        result_out_house=config["tier"]["get_off_social_probation"][
+            "result_out_house"
+        ],
+        description_out_house=config["tier"]["get_off_social_probation"][
+            "description_out_house"
+        ],
+    )
+
+    academic_suspension_term = StudyHourTier(
+        bound=config["tier"]["academic_suspension_term"]["bound"],
+        condition=config["tier"]["academic_suspension_term"]["condition"],
+        result_in_house=config["tier"]["academic_suspension_term"][
+            "result_in_house"
+        ],
+        description_in_house=config["tier"]["academic_suspension_term"][
+            "description_in_house"
+        ],
+        result_out_house=config["tier"]["academic_suspension_term"][
+            "result_out_house"
+        ],
+        description_out_house=config["tier"]["academic_suspension_term"][
+            "description_out_house"
+        ],
+    )
+    academic_suspension_cumulative = StudyHourTier(
+        bound=config["tier"]["academic_suspension_cumulative"]["bound"],
+        condition=config["tier"]["academic_suspension_cumulative"][
+            "condition"
+        ],
+        result_in_house=config["tier"]["academic_suspension_cumulative"][
+            "result_in_house"
+        ],
+        description_in_house=config["tier"]["academic_suspension_cumulative"][
+            "description_in_house"
+        ],
+        result_out_house=config["tier"]["academic_suspension_cumulative"][
+            "result_out_house"
+        ],
+        description_out_house=config["tier"]["academic_suspension_cumulative"][
+            "description_out_house"
+        ],
+    )
+    strike = StrikeTier(
+        bound=config["tier"]["strike"]["bound"],
+        condition=config["tier"]["strike"]["condition"],
+        number_chances=config["tier"]["strike"]["number_chances"],
+        result_in_house=config["tier"]["strike"]["result_in_house"],
+        description_in_house=config["tier"]["strike"]["description_in_house"],
+        result_out_house=config["tier"]["strike"]["result_out_house"],
+        description_out_house=config["tier"]["strike"][
+            "description_out_house"
+        ],
+    )
+    super_strike = StrikeTier(
+        bound=config["tier"]["super_strike"]["bound"],
+        condition=config["tier"]["super_strike"]["condition"],
+        number_chances=config["tier"]["super_strike"]["number_chances"],
+        result_in_house=config["tier"]["super_strike"]["result_in_house"],
+        description_in_house=config["tier"]["super_strike"][
+            "description_in_house"
+        ],
+        result_out_house=config["tier"]["super_strike"]["result_out_house"],
+        description_out_house=config["tier"]["super_strike"][
+            "description_out_house"
+        ],
+    )

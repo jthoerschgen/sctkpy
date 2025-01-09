@@ -1,52 +1,116 @@
-# The Scholarship Chairman's Toolkit 📚 
+# The Scholarship Chairman's Toolkit 📚
 
-The Scholarship Chairman's Toolkit (_SCTK_) is a collection of Python scripts for automating regular duties of a fraternity's (or any student organization's) scholarship chairman. Specifically, this tool is designed to generate reports and paperwork from grade and member roster data provided from the [Missouri S&T Greek Life Management Tool](https://involvement.mst.edu/fraternityandsororitylife/greek-resources/memberresources/).
+The Scholarship Chairman's Toolkit is a collection of Python scripts designed to automatically generate academic reports. These reports use grade/roster data provided from the Missouri University of Science and Technology, and evaluate the data using guidelines from the Standing Rules and Legislation of Eta Chapter of Beta Sigma Psi.
 
-## Features
+## Report Types
 
-- Generate Grade Report Spreadsheets with individual term GPA's and corresponding study hours that accommodates for members going on CO-OP or otherwise dropping below full-time status
-- TODO Study check sheets
-- Files checklist
-- TODO Generate Reports of member GPA overtime
+There are four types of reports which can be generated using this program. These reports types are the following.
 
-## Usage Guide
+### Study Hour Report
 
-To begin using SCTK download the __Membership Roster Report__ and __Individual Grade Report__ (select _Include class details in download file_ as well) from the [S&T Greek Life Management Tool](https://involvement.mst.edu/fraternityandsororitylife/greek-resources/memberresources/). The Membership Roster will save as _greeklife_roster_report.csv_, and each grade report will save as _ind_grade_report.csv_.
+This report is outlines what academic probations/study hours each member has for a given term. The specific GPA ranges for each academic probation is printed in the report's key. The average GPA for the house and each pledge class is also provided in this report. This report is designed to be sent out to the entire chapter.
 
-- Save _greeklife_roster_report.csv_ to the root directory of this repository.
-- Save each _ind_grade_report.csv_ into the _./gradereports/_ directory.
+### Study Check Report
 
-### Report Structure
+This report is a checklist used for enforcing study hours. You may need to make changes to the generated spreadsheet for member's on two study hours who wish to move their study hours to the second half.
 
-- The __Membership Roster Report__ data starts on row 4 and has the following columns:
-  - Last Name
-  - First Name
-  - Chapter Name*
-  - in/out House
-    - Value will either be "IN" or "OUT"
-  - Email
-  - Term*
-    - Value will be either SPXXXX or FSXXXX (e.g. SP2024)
+### Files Due List Report
 
-- The __Individual Grade Report__ data starts on row 3 and has the following columns:
-  - Name
-  - Term*
-    - Value will be either SPXXXX or FSXXXX (e.g. SP2024)
-  - Chapter*
-  - New Member
-  - Enroll Hrs
-  - Priv GPA
-  - Priv Cum GPA
-  - Term GPA
-  - Term Cum GPA
-  - Class
-  - Catalog No
-  - Hrs
-  - Grade
-  - Grade Type
+This report groups all of the members who are enrolled in the same class together as a master checklist for keeping track of what files have been submitted and checked off.
 
-`*all values in column are expected to be the same`
+### Membership/Strikes Report
 
-### Adding New Members and Removing Old Ones
+This report aggregates all of the campus grade report data for each member. There is a master sheet which counts all of the academic strikes/super strikes each member has. There are also subsequent sheets for each member, with a summary of all of their courses/grades and their GPA for each term. This report is not meant to be shared with the entire chapter.
 
-If your chapter has new members who are not otherwise on the Membership Roster Report you will need to add their information to the bottom of the CSV file and save it. Ensure that the first and last names are those the campus has on file (no nicknames). The report file is used to determine what members reports are generated for. Additionally, if you need to remove a member simply delete their row from the roster report CSV.
+## Acquiring Data
+
+In order to access roster/grade data you must have access as an officer to the [S&T Greek Life Management Tool](https://involvement.mst.edu/fraternityandsororitylife/greek-resources/memberresources/). Here, you will have access to download the _Membership Roster Report_ and _Individual Grade Reports_. The chapter may have archives of these as well.
+
+### Greeklife Roster Report
+
+The roster report will be a file named: _greeklife_roster_report.csv_, and will contain a list of info of all the active/associate members.
+
+The header for the roster will be on _row four_ of the csv file, and is expected to have the following columns:
+
+- "Last Name"
+- "First Name"
+- "Chapter Name"*
+- "in/out House", _(Values will either be "IN" or "OUT")_
+- "Email"
+- "Term"*, _(Values will be in the format: "SPXXXX" or "FSXXXX", e.g. "SP2024")_
+
+_*all rows in this column are expected to share the same value_
+
+### Individual Grade Reports
+
+The grade data will be from _FS/SPXXXX_ind_grade_report.csv_ files. For the program to work as intended, please provide grade reports for as far back as the earliest term any member being evaluated has been a member.
+
+The header for each grade report will be on _row three_ of the csv file, and is expected to have the following columns:
+
+- "Name"
+- "Term"*, _(Values will be in the format: "SPXXXX" or "FSXXXX", e.g. "SP2024")_
+- "Chapter"*
+- "New Member", _(Values will either be "Y" or "N")_
+- "Enroll Hrs"
+- "Priv GPA"
+- "Priv Cum GPA"
+- "Term GPA"
+- "Term Cum GPA"
+- "Class"
+- "Catalog No"
+- "Hrs"
+- "Grade"
+- "Grade Type"
+
+_*all rows in this column are expected to share the same value_
+
+Do not be concerned with deleting records from older reports over members who are no longer active in the house. The roster is used to determine which grade data from older grade reports should be used.
+
+If the data in the roster/grade reports does not have a header in the correct starting row, or any column label is misspelled, or any data which is expected to be in the format described above is not, then the program will throw an error.
+
+You are able to modify either the roster/grade reports and see the changes reflected in the reports you generate using this program.
+
+## Configuration
+
+For making changes to the GPA thresholds for evaluating different levels of academic probation, modify the values in `.\sctkpy\sctkpy\config.toml`
+
+## Using the Command-Line Tool
+
+The command-line tool provides an easy to use interface for generating academic reports using the campus provided grade data.
+
+To use the command-line tool in a _powershell_ window, execute the following command:
+
+```powershell
+.\sctkpy-cli.exe  --report-type TYPE --roster .\path\to\_greeklife_roster_report.csv --report-dir .\path\to\ind_grade_reports --save-dir .\path\where\report\saved --term TERM
+```
+
+The following are explanations of each option/flag required by the command-line tool.
+
+### Report Type Options
+
+To specify what kind of report you wish to generate, use one of the following options following the `--report-type` flag.
+
+- Study Hour Report: __"study-hours"__
+- Study Check Report: __"study-checks"__
+- Files Due Report: __"files-list"__
+- Member/Strikes Report: __"member-report"__
+
+### Roster Path Flag
+
+The `--roster` flag requires a path to the _greeklife_roster_report.csv_ file you wish to use for generating your report.
+
+### Report Directory Flag
+
+The `--report-dir` flag requires a path to a folder/directory of the _FS/SPXXXX_ind_grade_report.csv_ files you are using to generate your report.
+
+### Save Directory Flag
+
+The `--save-dir` flag specifies which folder/directory you want to save the generated report into.
+
+### Term Flag
+
+The `--term` flag specifies which term you want to generate the report from. The term must be in the format: _"SPXXXX"_ or _"FSXXXX"_. A valid example for a term would be _"FS2021"_. If you use a previous term, the report will still only generate for the member specified in the Greeklife Roster Report.
+
+## Disclaimer
+
+The design for all of the reports generated by the project are with the policy as of 2024 in mind. Any changes to the policy may require modifications. To request any modifications to the reports contact `jthoerschgen@gmail.com`, or otherwise make the modifications to this open-source project yourself.
