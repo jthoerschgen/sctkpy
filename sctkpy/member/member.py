@@ -78,9 +78,9 @@ class Member:
             str | None: The term the Member was a 'New Member' if it exists,
                 else None.
         """
-        for key, term in self.terms.items():
+        for term_label, term in self.terms.items():
             if term.new_member:
-                return key
+                return term_label
         return None
 
     def get_next_previous_term(self, selected_term: str) -> str | None:

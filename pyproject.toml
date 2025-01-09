@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools >= 61.0"]
+requires = ["setuptools >= 61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "sctkpy"
-version = "0.1.0"
+version = "1.0.0"
 description = "The Scholarship Chairman's Toolkit."
 authors = [{ name = "Jimmy Hoerschgen", email = "jthoerschgen@gmail.com" }]
 readme = "README.md"
@@ -21,10 +21,16 @@ sctkpy-cli = "sctkpy.cli:main"
 [tool.black]
 line-length = 79
 
+[tool.setuptools.packages]
+find = {}
+
+[tool.setuptools.package-data]
+sctkpy = ["config.toml", "templates/*"]
+
 [tool.flake8]
 max-line-length = 79
 exclude = ["__pycache__"]
-extend-ignore = []        # Put any PEP 8 Style Guide Exceptions Here
+extend-ignore = []
 
 [tool.isort]
 profile = "black"
