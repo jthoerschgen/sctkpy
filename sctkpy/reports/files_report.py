@@ -6,7 +6,7 @@ from datetime import datetime
 
 import openpyxl
 
-from sctkpy.config import files_hit_list_template_path, proj_root_dir
+from sctkpy.config import files_hit_list_template_path
 from sctkpy.reports.grade_report import GradeReport
 
 
@@ -23,7 +23,7 @@ class FilesReport(GradeReport):
             to. Defaults to None.
     """
 
-    def __init__(self, roster_report_path: str, save_dir: str = proj_root_dir):
+    def __init__(self, roster_report_path: str, save_dir: str):
         super().__init__(roster_report_path)
         self.template_path = files_hit_list_template_path
         self.save_dir = save_dir

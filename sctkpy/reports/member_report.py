@@ -6,12 +6,7 @@ from datetime import datetime
 
 import openpyxl
 
-from sctkpy.config import (
-    member_report_template_path,
-    proj_root_dir,
-    strike,
-    super_strike,
-)
+from sctkpy.config import member_report_template_path, strike, super_strike
 from sctkpy.member.course import Course
 from sctkpy.member.member import Member
 from sctkpy.member.term import Term
@@ -28,7 +23,7 @@ class MemberReport(GradeReport):
             to. Defaults to None.
     """
 
-    def __init__(self, roster_report_path: str, save_dir: str = proj_root_dir):
+    def __init__(self, roster_report_path: str, save_dir: str):
         super().__init__(roster_report_path)
         self.template_path: str = member_report_template_path
         self.save_dir: str = save_dir

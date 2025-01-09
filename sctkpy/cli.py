@@ -1,3 +1,5 @@
+"""The command-line interface for generating academic reports."""
+
 import argparse
 import random
 import re
@@ -34,8 +36,8 @@ def main() -> None:
  _____  _   _  ____                                                 #@@@%#*=-
 |_   _|| |_| || ===|                                              +@@@@@@@@@@@@@@%*+=:
   |_|  |_| |_||____|                                            -@@@@%@@@@@@@@@@@@@@@@@+
-  ____  ____  _   _  ____  _      ____  _____   ____  _   _  _ @@@@@@@-    =#@@@@@@@@@*
- (_ (_`/ (__`| |_| |/ () \| |__  / () \ | () ) (_ (_`| |_| || || ()_)%#+-      :@@@@%:
+  ____  ____  _   _  ____  _      ____  _____   ____  _   _  _ @@@@@@@- SC =#@@@@@@@@@*
+ (_ (_`/ (__`| |_| |/ () \| |__  / () \ | () ) (_ (_`| |_| || || ()_)%#+- TK   :@@@@%:
 .__)__)\____)|_| |_|\____/|____|/__/\__\|_|\_\.__)__)|_| |_||_||_|@@@@@@@@@@@%%@@@@-:%@-
  ____  _   _   ____  _____  _  __  __   ____   __  _ , ____@@@@@@@@@@@@@@@@@@@@@@*  +@@:
 / (__`| |_| | / () \ | () )| ||  \/  | / () \ |  \| | (_ (_`@@@@@@@@@@@@@@@@@@@@:   -@@-
@@ -92,6 +94,14 @@ def main() -> None:
     )
 
     parser.add_argument(
+        "--save-dir",
+        action="store",
+        type=str,
+        help="File path to directory of save location.",
+        metavar="PATH",
+    )
+
+    parser.add_argument(
         "--term",
         action="store",
         type=str,
@@ -101,9 +111,21 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    if not args.roster:
+        parser.error("--roster is required for this operation.")
+    if not args.report_dir:
+        parser.error("--report-dir is required for this operation.")
+    if (
+        args.report_type in ["study-hours", "study-checks", "files-list"]
+        and not args.term
+    ):
+        parser.error("--term is required for this report type.")
+
     if args.report_type == "study-hours":
         validate_term(args.term)
-        study_hour_report = StudyHourReport(roster_report_path=args.roster)
+        study_hour_report = StudyHourReport(
+            roster_report_path=args.roster, save_dir=args.save_dir
+        )
         study_hour_report.add_grade_report_dir(
             grade_report_dir_path=args.report_dir
         )
@@ -111,7 +133,9 @@ def main() -> None:
 
     if args.report_type == "study-checks":
         validate_term(args.term)
-        study_check_report = StudyCheckReport(roster_report_path=args.roster)
+        study_check_report = StudyCheckReport(
+            roster_report_path=args.roster, save_dir=args.save_dir
+        )
         study_check_report.add_grade_report_dir(
             grade_report_dir_path=args.report_dir
         )
@@ -119,14 +143,18 @@ def main() -> None:
 
     if args.report_type == "files-list":
         validate_term(args.term)
-        files_report = FilesReport(roster_report_path=args.roster)
+        files_report = FilesReport(
+            roster_report_path=args.roster, save_dir=args.save_dir
+        )
         files_report.add_grade_report_dir(
             grade_report_dir_path=args.report_dir
         )
         files_report(selected_term=args.term, open_on_finish=True)
 
     if args.report_type == "member-report":
-        member_report = MemberReport(roster_report_path=args.roster)
+        member_report = MemberReport(
+            roster_report_path=args.roster, save_dir=args.save_dir
+        )
         member_report.add_grade_report_dir(
             grade_report_dir_path=args.report_dir
         )

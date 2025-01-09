@@ -14,7 +14,6 @@ from sctkpy.config import (
     grade_report_template_path,
     no_punting,
     no_study_hours,
-    proj_root_dir,
     reduce_one_tier,
     reduce_two_tiers,
     social_probation,
@@ -38,11 +37,7 @@ class StudyHourReport(GradeReport):
             to. Defaults to None.
     """
 
-    def __init__(
-        self,
-        roster_report_path: str,
-        save_dir: str = proj_root_dir,
-    ):
+    def __init__(self, roster_report_path: str, save_dir: str):
         super().__init__(roster_report_path)
         self.template_path: str = grade_report_template_path
         self.save_dir: str = save_dir
