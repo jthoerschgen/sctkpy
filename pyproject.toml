@@ -16,7 +16,7 @@ dependencies = ["openpyxl"]
 Repository = "https://github.com/jthoerschgen/sctkpy"
 
 [project.scripts]
-sctkpy-cli = "sctkpy.cli:main"
+sctkpy = "sctkpy.cli:main"
 
 [tool.black]
 line-length = 79
