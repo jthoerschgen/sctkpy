@@ -85,7 +85,7 @@ To install the command-line tool, use _pipx_.
 To use the command-line tool in a _powershell_ window, execute the following command:
 
 ```powershell
-.\sctkpy  --report-type TYPE --roster .\path\to\_greeklife_roster_report.csv --report-dir .\path\to\ind_grade_reports --save-dir .\path\where\report\saved --term TERM
+sctkpy  --report-type TYPE --roster .\path\to\_greeklife_roster_report.csv --report-dir .\path\to\ind_grade_reports --save-dir .\path\where\report\saved --term TERM
 ```
 
 The following are explanations of each option/flag required by the command-line tool.
